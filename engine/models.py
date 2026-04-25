@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Literal, Optional
+from typing import List, Literal
 
 from pydantic import BaseModel, Field
 
@@ -8,22 +8,21 @@ TurnKind = Literal["prompted", "created", "gave", "selected", "other"]
 
 
 class Turn(BaseModel):
-    id: str
-    timestamp: str  # YYYY-MM-DD HH:mm:ss
+    turn_id: str
+    timestamp: str  # YYYY-MM-DD HH:mm:ss (local)
     timestamp_utc: str  # original ISO-8601 from Takeout
     kind: TurnKind = "prompted"
     prompt: str = ""
-    response_md: str = ""
-    response_html: str = ""
+    response: str = ""  # raw HTML from Gemini; the Renderer turns this into MD
     attachments: List[str] = Field(default_factory=list)
     visibility_flag: bool = True
 
 
 class Session(BaseModel):
-    id: str
+    session_id: str
     title: str
-    start: str  # YYYY-MM-DD HH:mm:ss of first turn
-    end: str  # YYYY-MM-DD HH:mm:ss of last turn
+    start_time: str
+    last_active_time: str
     turns: List[Turn]
 
     @property
@@ -32,14 +31,14 @@ class Session(BaseModel):
 
 
 class Archive(BaseModel):
-    source: str  # path to the raw folder
+    source: str
     sessions: List[Session]
 
 
 class SessionSummary(BaseModel):
-    id: str
+    session_id: str
     title: str
-    start: str
-    end: str
+    start_time: str
+    last_active_time: str
     turn_count: int
     visible_count: int

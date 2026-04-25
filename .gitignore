@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 node_modules/
 warehouse/processed/
+warehouse/turns_md/
 exports/
 .DS_Store
 data

@@ -5,10 +5,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from .html_to_md import html_to_markdown
 from .models import Archive, Session, Turn, TurnKind
 
 ACTIVITY_FILENAME = "我的活動.json"
+TITLE_MAX_CHARS = 20
 
 _TITLE_PREFIX_TO_KIND: Dict[str, TurnKind] = {
     "Prompted": "prompted",
@@ -69,19 +69,23 @@ def _entry_to_turn(entry: dict) -> Optional[Turn]:
             name = subs[0].get("name", "")
             if name:
                 html = f"<pre>{name}</pre>"
-    response_md = html_to_markdown(html) if html else ""
     turn_id = f"T{int(dt_utc.timestamp())}"
     return Turn(
-        id=turn_id,
+        turn_id=turn_id,
         timestamp=_format_local(dt_utc),
         timestamp_utc=dt_utc.isoformat().replace("+00:00", "Z"),
         kind=kind,
         prompt=prompt,
-        response_md=response_md,
-        response_html=html,
+        response=html,
         attachments=_attachments_from_entry(entry),
         visibility_flag=True,
     )
+
+
+def _make_title(group: List[Turn]) -> str:
+    src = next((t.prompt for t in group if t.kind == "prompted" and t.prompt), group[0].prompt) or ""
+    src = " ".join(src.strip().splitlines())
+    return src[:TITLE_MAX_CHARS] if src else "(untitled)"
 
 
 def _group_sessions(turns: List[Turn], gap_seconds: int) -> List[Session]:
@@ -100,14 +104,12 @@ def _group_sessions(turns: List[Turn], gap_seconds: int) -> List[Session]:
     for group in groups:
         first = group[0]
         first_unix = int(datetime.fromisoformat(first.timestamp_utc.replace("Z", "+00:00")).timestamp())
-        sid = f"S{first_unix}"
-        title = next((t.prompt for t in group if t.kind == "prompted" and t.prompt), first.prompt) or "(untitled session)"
         sessions.append(
             Session(
-                id=sid,
-                title=title.strip().splitlines()[0][:200] if title else "(untitled session)",
-                start=group[0].timestamp,
-                end=group[-1].timestamp,
+                session_id=f"S{first_unix}",
+                title=_make_title(group),
+                start_time=group[0].timestamp,
+                last_active_time=group[-1].timestamp,
                 turns=group,
             )
         )
@@ -138,7 +140,7 @@ def merge_visibility(archive: Archive, processed_dir: Path) -> Archive:
     if not processed_dir.exists():
         return archive
     for session in archive.sessions:
-        path = processed_dir / f"session_{session.id}.json"
+        path = processed_dir / f"session_{session.session_id}.json"
         if not path.exists():
             continue
         try:
@@ -147,12 +149,12 @@ def merge_visibility(archive: Archive, processed_dir: Path) -> Archive:
             continue
         flags: Dict[str, bool] = {}
         for t in existing.get("turns", []):
-            tid = t.get("id")
+            tid = t.get("turn_id")
             if tid is not None:
                 flags[tid] = bool(t.get("visibility_flag", True))
         for turn in session.turns:
-            if turn.id in flags:
-                turn.visibility_flag = flags[turn.id]
+            if turn.turn_id in flags:
+                turn.visibility_flag = flags[turn.turn_id]
     return archive
 
 
@@ -160,7 +162,7 @@ def write_processed(archive: Archive, processed_dir: Path) -> List[Path]:
     processed_dir.mkdir(parents=True, exist_ok=True)
     written: List[Path] = []
     for session in archive.sessions:
-        path = processed_dir / f"session_{session.id}.json"
+        path = processed_dir / f"session_{session.session_id}.json"
         path.write_text(session.model_dump_json(indent=2), encoding="utf-8")
         written.append(path)
     return written

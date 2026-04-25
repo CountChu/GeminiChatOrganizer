@@ -1,5 +1,6 @@
 const path = require("path");
 const fs = require("fs");
+const { spawnSync } = require("child_process");
 const express = require("express");
 const { PythonBridge } = require("./python_bridge");
 
@@ -18,7 +19,19 @@ function loadFlatYaml(p) {
   return out;
 }
 
-const RAW_DIR = path.resolve(REPO_ROOT, loadFlatYaml(CONFIG_PATH).raw_dir);
+const syncCfg = loadFlatYaml(CONFIG_PATH);
+const RAW_DIR = path.resolve(REPO_ROOT, syncCfg.raw_dir);
+const TURNS_MD_DIR = path.resolve(REPO_ROOT, syncCfg.turns_md_dir || "warehouse/turns_md");
+
+console.log("Pre-rendering per-Turn MD cache...");
+const render = spawnSync(PYTHON_PATH, ["-m", "engine.cli", "render", "--config", CONFIG_PATH], {
+  cwd: REPO_ROOT,
+  stdio: ["ignore", "inherit", "inherit"],
+});
+if (render.status !== 0) {
+  console.error(`Renderer exited with code ${render.status}; aborting startup.`);
+  process.exit(render.status || 1);
+}
 
 const bridge = new PythonBridge({ pythonPath: PYTHON_PATH, repoRoot: REPO_ROOT, configPath: CONFIG_PATH });
 bridge.start();
@@ -27,6 +40,7 @@ const app = express();
 app.use(express.json({ limit: "1mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 app.use("/raw", express.static(RAW_DIR));
+app.use("/turns_md", express.static(TURNS_MD_DIR));
 
 function asHandler(fn) {
   return async (req, res) => {

@@ -1,4 +1,5 @@
 const state = { sessions: [], current: null, sortDir: "asc", hideHidden: false, mdPreview: false };
+const turnMdCache = new Map();
 
 const IMG_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp"]);
 function isImage(name) {
@@ -8,6 +9,9 @@ function isImage(name) {
 }
 function rawUrl(name) {
   return "/raw/" + encodeURIComponent(name);
+}
+function turnMdUrl(turnId) {
+  return "/turns_md/" + encodeURIComponent(turnId) + ".md";
 }
 
 const $ = (sel) => document.querySelector(sel);
@@ -33,6 +37,14 @@ async function api(path, opts = {}) {
   return res.json();
 }
 
+async function fetchTurnMd(turnId) {
+  if (turnMdCache.has(turnId)) return turnMdCache.get(turnId);
+  const res = await fetch(turnMdUrl(turnId));
+  const text = res.ok ? await res.text() : "";
+  turnMdCache.set(turnId, text);
+  return text;
+}
+
 function setStatus(msg, isError = false) {
   statusEl.textContent = msg;
   statusEl.style.color = isError ? "#a33" : "#666";
@@ -47,22 +59,22 @@ function renderSessionsList() {
   const q = searchEl.value.trim().toLowerCase();
   sessionsListEl.innerHTML = "";
   const ordered = state.sortDir === "desc"
-    ? [...state.sessions].sort((a, b) => b.start.localeCompare(a.start))
-    : [...state.sessions].sort((a, b) => a.start.localeCompare(b.start));
+    ? [...state.sessions].sort((a, b) => b.start_time.localeCompare(a.start_time))
+    : [...state.sessions].sort((a, b) => a.start_time.localeCompare(b.start_time));
   for (const s of ordered) {
     if (q && !s.title.toLowerCase().includes(q)) continue;
     if (state.hideHidden && s.visible_count === 0) continue;
     const li = document.createElement("li");
-    li.dataset.id = s.id;
-    if (state.current && state.current.id === s.id) li.classList.add("active");
+    li.dataset.id = s.session_id;
+    if (state.current && state.current.session_id === s.session_id) li.classList.add("active");
     li.innerHTML = `
       <div class="session-title"></div>
       <div class="session-meta"></div>
     `;
     li.querySelector(".session-title").textContent = s.title || "(untitled)";
     li.querySelector(".session-meta").textContent =
-      `${s.start.split(" ")[0]} · ${s.visible_count}/${s.turn_count} visible`;
-    li.addEventListener("click", () => loadSession(s.id));
+      `${s.start_time.split(" ")[0]} · ${s.visible_count}/${s.turn_count} visible`;
+    li.addEventListener("click", () => loadSession(s.session_id));
     sessionsListEl.appendChild(li);
   }
 }
@@ -79,12 +91,12 @@ async function loadSession(id) {
   setStatus("loading session…");
   const data = await api(`/api/sessions/${id}`);
   state.current = data.session;
-  renderTurns();
+  await renderTurns();
   renderSessionsList();
   setStatus(`session ${id}`);
 }
 
-function renderTurns() {
+async function renderTurns() {
   if (!state.current) {
     turnsEmptyEl.hidden = false;
     turnsContentEl.hidden = true;
@@ -94,15 +106,16 @@ function renderTurns() {
   turnsContentEl.hidden = false;
   sessionTitleEl.textContent = state.current.title || "(untitled)";
   sessionMetaEl.textContent =
-    `${state.current.id} · ${formatRange(state.current.start, state.current.end)} · ${state.current.turns.length} turns`;
+    `${state.current.session_id} · ${formatRange(state.current.start_time, state.current.last_active_time)} · ${state.current.turns.length} turns`;
   turnsListEl.innerHTML = "";
-  for (const turn of state.current.turns) {
-    if (state.hideHidden && !turn.visibility_flag) continue;
-    turnsListEl.appendChild(renderTurn(turn));
-  }
+  const visibleTurns = state.current.turns.filter((t) => !(state.hideHidden && !t.visibility_flag));
+  const mdTexts = await Promise.all(visibleTurns.map((t) => fetchTurnMd(t.turn_id)));
+  visibleTurns.forEach((turn, i) => {
+    turnsListEl.appendChild(renderTurn(turn, mdTexts[i]));
+  });
 }
 
-function renderTurn(turn) {
+function renderTurn(turn, turnMdText) {
   const div = document.createElement("div");
   div.className = "turn" + (turn.visibility_flag ? "" : " hidden");
   const promptText = turn.prompt || "(no prompt — " + turn.kind + ")";
@@ -123,15 +136,26 @@ function renderTurn(turn) {
   const btn = div.querySelector(".toggle-btn");
   btn.dataset.visible = String(turn.visibility_flag);
   btn.textContent = turn.visibility_flag ? "Visible" : "Hidden";
-  btn.addEventListener("click", () => toggleTurn(turn.id, !turn.visibility_flag));
+  btn.addEventListener("click", () => toggleTurn(turn.turn_id, !turn.visibility_flag));
   div.querySelector(".turn-prompt").textContent = promptText;
   const respEl = div.querySelector(".turn-response");
-  if (state.mdPreview && turn.response_md && typeof marked !== "undefined") {
+  if (state.mdPreview && turnMdText && typeof marked !== "undefined") {
     respEl.classList.add("preview");
-    respEl.innerHTML = marked.parse(turn.response_md);
+    respEl.innerHTML = marked.parse(turnMdText);
+    if (typeof renderMathInElement === "function") {
+      renderMathInElement(respEl, {
+        delimiters: [
+          { left: "$$", right: "$$", display: true },
+          { left: "$", right: "$", display: false },
+          { left: "\\[", right: "\\]", display: true },
+          { left: "\\(", right: "\\)", display: false },
+        ],
+        throwOnError: false,
+      });
+    }
   } else {
     respEl.classList.remove("preview");
-    respEl.textContent = turn.response_md || "(no response)";
+    respEl.textContent = turnMdText || "(no rendered MD)";
   }
   if (turn.attachments && turn.attachments.length) {
     const at = div.querySelector(".turn-attachments");
@@ -165,20 +189,20 @@ function renderTurn(turn) {
 
 async function toggleTurn(turnId, visible) {
   if (!state.current) return;
-  const sid = state.current.id;
+  const sid = state.current.session_id;
   try {
     setStatus("toggling…");
     await api(`/api/sessions/${sid}/turns/${turnId}/visibility`, {
       method: "POST",
       body: JSON.stringify({ visible }),
     });
-    const turn = state.current.turns.find((t) => t.id === turnId);
+    const turn = state.current.turns.find((t) => t.turn_id === turnId);
     if (turn) turn.visibility_flag = visible;
-    const summary = state.sessions.find((s) => s.id === sid);
+    const summary = state.sessions.find((s) => s.session_id === sid);
     if (summary) {
       summary.visible_count = state.current.turns.filter((t) => t.visibility_flag).length;
     }
-    renderTurns();
+    await renderTurns();
     renderSessionsList();
     setStatus("saved");
   } catch (e) {
@@ -201,6 +225,7 @@ async function organizeAll() {
 
 async function reload() {
   setStatus("reloading…");
+  turnMdCache.clear();
   await api("/api/reload", { method: "POST", body: JSON.stringify({}) });
   await loadSessions();
 }
