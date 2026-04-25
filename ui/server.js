@@ -1,4 +1,5 @@
 const path = require("path");
+const fs = require("fs");
 const express = require("express");
 const { PythonBridge } = require("./python_bridge");
 
@@ -7,12 +8,25 @@ const REPO_ROOT = path.resolve(__dirname, "..");
 const PYTHON_PATH = path.join(REPO_ROOT, ".venv", "bin", "python");
 const CONFIG_PATH = path.join(REPO_ROOT, "sync_config.yaml");
 
+function loadFlatYaml(p) {
+  const out = {};
+  for (const line of fs.readFileSync(p, "utf8").split("\n")) {
+    const m = line.match(/^([a-z_]+):\s*(.*?)\s*$/);
+    if (!m) continue;
+    out[m[1]] = /^-?\d+$/.test(m[2]) ? parseInt(m[2], 10) : m[2];
+  }
+  return out;
+}
+
+const RAW_DIR = path.resolve(REPO_ROOT, loadFlatYaml(CONFIG_PATH).raw_dir);
+
 const bridge = new PythonBridge({ pythonPath: PYTHON_PATH, repoRoot: REPO_ROOT, configPath: CONFIG_PATH });
 bridge.start();
 
 const app = express();
 app.use(express.json({ limit: "1mb" }));
 app.use(express.static(path.join(__dirname, "public")));
+app.use("/raw", express.static(RAW_DIR));
 
 function asHandler(fn) {
   return async (req, res) => {

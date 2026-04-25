@@ -1,5 +1,15 @@
 const state = { sessions: [], current: null, sortDir: "asc", hideHidden: false, mdPreview: false };
 
+const IMG_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp"]);
+function isImage(name) {
+  const i = name.lastIndexOf(".");
+  if (i < 0) return false;
+  return IMG_EXTS.has(name.slice(i + 1).toLowerCase());
+}
+function rawUrl(name) {
+  return "/raw/" + encodeURIComponent(name);
+}
+
 const $ = (sel) => document.querySelector(sel);
 const sessionsListEl = $("#sessions-list");
 const searchEl = $("#search");
@@ -125,7 +135,30 @@ function renderTurn(turn) {
   }
   if (turn.attachments && turn.attachments.length) {
     const at = div.querySelector(".turn-attachments");
-    at.textContent = "📎 " + turn.attachments.join(", ");
+    if (state.mdPreview) {
+      at.classList.add("preview");
+      at.innerHTML = "";
+      for (const name of turn.attachments) {
+        if (isImage(name)) {
+          const img = document.createElement("img");
+          img.src = rawUrl(name);
+          img.alt = name;
+          img.title = name;
+          img.loading = "lazy";
+          at.appendChild(img);
+        } else {
+          const a = document.createElement("a");
+          a.href = rawUrl(name);
+          a.textContent = "📎 " + name;
+          a.target = "_blank";
+          a.rel = "noopener";
+          at.appendChild(a);
+        }
+      }
+    } else {
+      at.classList.remove("preview");
+      at.textContent = "📎 " + turn.attachments.join(", ");
+    }
   }
   return div;
 }
