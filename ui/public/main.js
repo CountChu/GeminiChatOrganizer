@@ -98,9 +98,9 @@ function renderTurn(turn) {
   const promptText = turn.prompt || "(no prompt — " + turn.kind + ")";
   div.innerHTML = `
     <div class="turn-head">
+      <button class="toggle-btn"></button>
       <span class="turn-ts"></span>
       <span class="turn-kind"></span>
-      <button class="toggle-btn"></button>
     </div>
     <div class="turn-prompt"></div>
     <div class="turn-response"></div>

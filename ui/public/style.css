@@ -25,7 +25,7 @@ main { display: grid; grid-template-columns: 320px 1fr; height: calc(100vh - 51p
 #session-meta { color: #888; font-size: 12px; margin-bottom: 16px; }
 .turn { border: 1px solid #e0e0e0; background: #fff; border-radius: 6px; margin-bottom: 12px; padding: 12px 14px; }
 .turn.hidden { opacity: 0.5; background: #f6f6f6; }
-.turn-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; gap: 12px; }
+.turn-head { display: flex; justify-content: flex-start; align-items: center; margin-bottom: 6px; gap: 12px; }
 .turn-ts { color: #666; font-size: 12px; font-family: monospace; }
 .turn-kind { font-size: 11px; padding: 1px 6px; border-radius: 10px; background: #eef; color: #335; }
 .turn-kind.created { background: #efe; color: #353; }

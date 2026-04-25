@@ -50,6 +50,12 @@
 - `sync_config.yaml`：定義下載頻率、儲存路徑。  
 - `export_template.yaml`：定義 Markdown 輸出模板（如：是否在標題顯示時間戳、換行格式）。
 
+### 2.5 UI 互動 (UI Interaction)
+
+- **可見性切換 (Visibility Toggle)**：每個輪次 (Turn) 必須在標頭起始端提供一個切換控制項，可即時翻轉其 `visibility_flag`。狀態變更必須立即持久化（不需另行儲存）。  
+- **隱藏已隱藏項目過濾器 (Hide-Hidden Filter)**：UI 必須提供一個全域切換；啟用時，將 `visibility_flag` 為 `false` 的輪次從輪次檢視中移除。當此過濾器啟用時，所有輪次皆已隱藏的對話單元 (Session) 也必須從清單中移除，並在其中任一輪次再次變為可見時自動重新出現。  
+- **對話單元排序順序 (Session Sort Order)**：對話單元清單必須能依起始時間進行升冪或降冪排序；排序方向為僅檢視層的偏好設定，不得影響持久化狀態。
+
 ## 3. Design (設計) — 「系統如何架構？」
 
 ### 3.1 核心組件職責

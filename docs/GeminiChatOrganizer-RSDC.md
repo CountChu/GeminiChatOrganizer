@@ -50,6 +50,12 @@ This document defines the development framework for the "Gemini Chat Organizer,"
 - `sync_config.yaml`: Defines download frequency and storage paths.  
 - `export_template.yaml`: Defines Markdown output templates (e.g., whether to show timestamps in headers, line break formats).
 
+### 2.5 UI Interaction
+
+- **Visibility Toggle**: Each Turn must expose a per-Turn control on the leading edge of its header that flips its `visibility_flag`. The state change must persist immediately (no separate save action).  
+- **Hide-Hidden Filter**: The UI must provide a global toggle that, when active, removes Turns whose `visibility_flag` is `false` from the Turn view. While the filter is active, Sessions whose Turns are all hidden must also be removed from the Session list, and reappear automatically as soon as any of their Turns becomes visible again.  
+- **Session Sort Order**: The Session list must be sortable by start time in either ascending or descending direction; sort direction is a view-only preference and must not alter persisted state.
+
 ## 3. Design — "How is the system architected?"
 
 ### 3.1 Core Component Responsibilities
