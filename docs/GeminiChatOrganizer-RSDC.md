@@ -73,7 +73,7 @@ This document defines the development framework for the "Gemini Chat Organizer,"
 
 - **Visibility Toggle**: Updates `visibility_flag` in real time.  
 - **Markdown-Rendering Driven**: The UI does not parse JSON text directly; it reads pre-generated MD file paths and renders from those.  
-- **Organize Action**: A user-initiated action that materializes Sessions, with only their currently visible Turns, as Markdown documents for sharing or archival. Triggered on demand only; the system performs no implicit or scheduled exports. The interaction flow:
+- **Organize Action**: A user-initiated action that materializes Sessions, with only their currently visible Turns, as Markdown documents for sharing or archival. Sessions with no visible Turns produce no Final Artifact. Triggered on demand only; the system performs no implicit or scheduled exports. The interaction flow:
   - The user invokes the global "Organize all" control.
   - The UI requests confirmation before producing any output.
   - During execution the UI enters a locked state; visibility toggles and other edits are disabled until the action completes.

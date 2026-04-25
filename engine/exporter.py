@@ -76,6 +76,8 @@ def export_archive(
     for session in sessions:
         if only_ids is not None and session.session_id not in only_ids:
             continue
+        if not any(t.visibility_flag for t in session.turns):
+            continue
         written.append(export_session(session, template_cfg, exports_dir, turns_md_dir))
     return written
 
