@@ -1,0 +1,8 @@
+timestamp_in_header: true
+turn_separator: "\n\n---\n\n"
+filename_pattern: "{date}_{sid}_{slug}.md"
+slug_max_chars: 40
+session_header: "# {{ title }}"
+turn_header: "## {{ timestamp }} — {{ prompt_preview }}"
+prompt_block: "**Prompt:**\n\n{{ prompt }}"
+response_block: "**Response:**\n\n{{ response_md }}"

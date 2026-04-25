@@ -1,0 +1,166 @@
+from __future__ import annotations
+
+import json
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+
+from .html_to_md import html_to_markdown
+from .models import Archive, Session, Turn, TurnKind
+
+ACTIVITY_FILENAME = "我的活動.json"
+
+_TITLE_PREFIX_TO_KIND: Dict[str, TurnKind] = {
+    "Prompted": "prompted",
+    "Created": "created",
+    "Gave": "gave",
+    "Selected": "selected",
+}
+
+
+def _format_local(dt_utc: datetime) -> str:
+    return dt_utc.astimezone().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _classify(title: str) -> Tuple[TurnKind, str]:
+    if not title:
+        return "other", ""
+    head, _, rest = title.partition(" ")
+    kind = _TITLE_PREFIX_TO_KIND.get(head, "other")
+    if kind == "prompted":
+        return kind, rest
+    return kind, title
+
+
+def _attachments_from_entry(entry: dict) -> List[str]:
+    attachments: List[str] = []
+    image = entry.get("imageFile")
+    if isinstance(image, dict):
+        name = image.get("name") or image.get("url")
+        if name:
+            attachments.append(str(name))
+    elif isinstance(image, str):
+        attachments.append(image)
+    for af in entry.get("attachedFiles") or []:
+        if isinstance(af, dict):
+            name = af.get("name") or af.get("url")
+            if name:
+                attachments.append(str(name))
+        elif isinstance(af, str):
+            attachments.append(af)
+    return attachments
+
+
+def _entry_to_turn(entry: dict) -> Optional[Turn]:
+    time_raw = entry.get("time")
+    if not time_raw:
+        return None
+    iso = time_raw.replace("Z", "+00:00")
+    dt_utc = datetime.fromisoformat(iso).astimezone(timezone.utc)
+    title = entry.get("title", "") or ""
+    kind, prompt = _classify(title)
+    html = ""
+    safe = entry.get("safeHtmlItem")
+    if isinstance(safe, list) and safe and isinstance(safe[0], dict):
+        html = safe[0].get("html", "") or ""
+    if not html and kind == "created":
+        subs = entry.get("subtitles")
+        if isinstance(subs, list) and subs and isinstance(subs[0], dict):
+            name = subs[0].get("name", "")
+            if name:
+                html = f"<pre>{name}</pre>"
+    response_md = html_to_markdown(html) if html else ""
+    turn_id = f"T{int(dt_utc.timestamp())}"
+    return Turn(
+        id=turn_id,
+        timestamp=_format_local(dt_utc),
+        timestamp_utc=dt_utc.isoformat().replace("+00:00", "Z"),
+        kind=kind,
+        prompt=prompt,
+        response_md=response_md,
+        response_html=html,
+        attachments=_attachments_from_entry(entry),
+        visibility_flag=True,
+    )
+
+
+def _group_sessions(turns: List[Turn], gap_seconds: int) -> List[Session]:
+    if not turns:
+        return []
+    turns_sorted = sorted(turns, key=lambda t: t.timestamp_utc)
+    groups: List[List[Turn]] = [[turns_sorted[0]]]
+    for prev, cur in zip(turns_sorted, turns_sorted[1:]):
+        prev_dt = datetime.fromisoformat(prev.timestamp_utc.replace("Z", "+00:00"))
+        cur_dt = datetime.fromisoformat(cur.timestamp_utc.replace("Z", "+00:00"))
+        if (cur_dt - prev_dt).total_seconds() > gap_seconds:
+            groups.append([cur])
+        else:
+            groups[-1].append(cur)
+    sessions: List[Session] = []
+    for group in groups:
+        first = group[0]
+        first_unix = int(datetime.fromisoformat(first.timestamp_utc.replace("Z", "+00:00")).timestamp())
+        sid = f"S{first_unix}"
+        title = next((t.prompt for t in group if t.kind == "prompted" and t.prompt), first.prompt) or "(untitled session)"
+        sessions.append(
+            Session(
+                id=sid,
+                title=title.strip().splitlines()[0][:200] if title else "(untitled session)",
+                start=group[0].timestamp,
+                end=group[-1].timestamp,
+                turns=group,
+            )
+        )
+    return sessions
+
+
+def parse_archive(raw_dir: Path, session_gap_seconds: int) -> Archive:
+    activity_path = raw_dir / ACTIVITY_FILENAME
+    if not activity_path.exists():
+        raise FileNotFoundError(f"Activity file not found: {activity_path}")
+    data = json.loads(activity_path.read_text(encoding="utf-8"))
+    if not isinstance(data, list):
+        raise ValueError(f"Expected list at top level of {activity_path}, got {type(data).__name__}")
+    turns: List[Turn] = []
+    for entry in data:
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("header") != "Gemini Apps":
+            continue
+        turn = _entry_to_turn(entry)
+        if turn is not None:
+            turns.append(turn)
+    sessions = _group_sessions(turns, session_gap_seconds)
+    return Archive(source=str(raw_dir), sessions=sessions)
+
+
+def merge_visibility(archive: Archive, processed_dir: Path) -> Archive:
+    if not processed_dir.exists():
+        return archive
+    for session in archive.sessions:
+        path = processed_dir / f"session_{session.id}.json"
+        if not path.exists():
+            continue
+        try:
+            existing = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        flags: Dict[str, bool] = {}
+        for t in existing.get("turns", []):
+            tid = t.get("id")
+            if tid is not None:
+                flags[tid] = bool(t.get("visibility_flag", True))
+        for turn in session.turns:
+            if turn.id in flags:
+                turn.visibility_flag = flags[turn.id]
+    return archive
+
+
+def write_processed(archive: Archive, processed_dir: Path) -> List[Path]:
+    processed_dir.mkdir(parents=True, exist_ok=True)
+    written: List[Path] = []
+    for session in archive.sessions:
+        path = processed_dir / f"session_{session.id}.json"
+        path.write_text(session.model_dump_json(indent=2), encoding="utf-8")
+        written.append(path)
+    return written
