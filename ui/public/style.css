@@ -35,6 +35,16 @@ main { display: grid; grid-template-columns: 320px 1fr; height: calc(100vh - 51p
 .toggle-btn[data-visible="false"] { background: #fdecea; color: #a33; }
 .turn-prompt { font-weight: 500; margin: 6px 0; white-space: pre-wrap; word-break: break-word; }
 .turn-response { color: #333; max-height: 320px; overflow: auto; background: #fafafa; padding: 8px 12px; border-radius: 4px; white-space: pre-wrap; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+.turn-response.preview { white-space: normal; font-family: inherit; font-size: 13px; line-height: 1.5; }
+.turn-response.preview h1, .turn-response.preview h2, .turn-response.preview h3, .turn-response.preview h4 { margin: 0.6em 0 0.3em; }
+.turn-response.preview p { margin: 0.4em 0; }
+.turn-response.preview ul, .turn-response.preview ol { margin: 0.3em 0; padding-left: 1.6em; }
+.turn-response.preview pre { background: #eee; padding: 8px 10px; border-radius: 4px; overflow: auto; font-size: 12px; }
+.turn-response.preview code { background: #eee; padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+.turn-response.preview pre code { background: transparent; padding: 0; }
+.turn-response.preview blockquote { border-left: 3px solid #ccc; margin: 0.4em 0; padding: 0 0.8em; color: #555; }
+.turn-response.preview table { border-collapse: collapse; }
+.turn-response.preview th, .turn-response.preview td { border: 1px solid #ddd; padding: 4px 8px; }
 .turn-attachments { margin-top: 8px; font-size: 12px; }
 #lock-overlay[hidden] { display: none; }
 #lock-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 18px; z-index: 100; }

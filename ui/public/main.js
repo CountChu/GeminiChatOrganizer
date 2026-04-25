@@ -1,4 +1,4 @@
-const state = { sessions: [], current: null, sortDir: "asc", hideHidden: false };
+const state = { sessions: [], current: null, sortDir: "asc", hideHidden: false, mdPreview: false };
 
 const $ = (sel) => document.querySelector(sel);
 const sessionsListEl = $("#sessions-list");
@@ -115,7 +115,14 @@ function renderTurn(turn) {
   btn.textContent = turn.visibility_flag ? "Visible" : "Hidden";
   btn.addEventListener("click", () => toggleTurn(turn.id, !turn.visibility_flag));
   div.querySelector(".turn-prompt").textContent = promptText;
-  div.querySelector(".turn-response").textContent = turn.response_md || "(no response)";
+  const respEl = div.querySelector(".turn-response");
+  if (state.mdPreview && turn.response_md && typeof marked !== "undefined") {
+    respEl.classList.add("preview");
+    respEl.innerHTML = marked.parse(turn.response_md);
+  } else {
+    respEl.classList.remove("preview");
+    respEl.textContent = turn.response_md || "(no response)";
+  }
   if (turn.attachments && turn.attachments.length) {
     const at = div.querySelector(".turn-attachments");
     at.textContent = "📎 " + turn.attachments.join(", ");
@@ -176,6 +183,10 @@ $("#sort-btn").addEventListener("click", () => {
 $("#hide-hidden").addEventListener("change", (e) => {
   state.hideHidden = e.target.checked;
   renderSessionsList();
+  renderTurns();
+});
+$("#md-preview").addEventListener("change", (e) => {
+  state.mdPreview = e.target.checked;
   renderTurns();
 });
 
