@@ -72,7 +72,12 @@ This document defines the development framework for the "Gemini Chat Organizer,"
 ### 2.7 UI Interaction Rules
 
 - **Visibility Toggle**: Updates `visibility_flag` in real time.  
-- **Markdown-Rendering Driven**: The UI does not parse JSON text directly; it reads pre-generated MD file paths and renders from those.
+- **Markdown-Rendering Driven**: The UI does not parse JSON text directly; it reads pre-generated MD file paths and renders from those.  
+- **Organize Action**: A user-initiated action that materializes Sessions, with only their currently visible Turns, as Markdown documents for sharing or archival. Triggered on demand only; the system performs no implicit or scheduled exports. The interaction flow:
+  - The user invokes the global "Organize all" control.
+  - The UI requests confirmation before producing any output.
+  - During execution the UI enters a locked state; visibility toggles and other edits are disabled until the action completes.
+  - On completion the UI reports the number of artifacts produced; on failure it surfaces the error and releases the lock.
 
 ## 3. Design — "How is the system architected?"
 
@@ -86,7 +91,7 @@ This document defines the development framework for the "Gemini Chat Organizer,"
   - **Parser**: Converts raw data into structured JSON stored under `processed/`.  
   - **Renderer (`render_md_files.py`)**: **The core sync component.** Iterates over every Turn, rendering Prompt and Response into independent `.md` files in the cache directory.  
   - **Exporter**: Merges the selected MD cache files to produce the final report.  
-- **Local Repository**: The local data warehouse.
+- **Local Repository**: The local data warehouse. **Visibility state ownership**: each Turn's `visibility_flag` lives alongside its other attributes inside the per-Session JSON file at `warehouse/processed/session_<session_id>.json`. The per-Turn MD cache under `warehouse/turns_md/` is content-only and does **not** carry visibility — it is the immutable output of the Renderer.
 
 ### 3.2 Directory Structure
 
@@ -108,8 +113,19 @@ exports/             Final exported Markdown files
 1. **Startup**: App launches; Node.js immediately runs `python engine/render_md.py`.  
 2. **Pre-rendering**: `render_md.py` inspects the `processed/` data and, for each `turn_id`, produces a corresponding `.md` under `warehouse/turns_md/`.  
 3. **UI Loading**: Node.js sends the MD file list and metadata to the frontend; the frontend reads the MD content directly and displays it.  
-4. **Interactive Toggle**: The user toggles `visibility_flag`; Node.js updates the JSON data, and the frontend hides/shows the corresponding MD block based on the state marker.  
+4. **Interactive Toggle**: The user toggles `visibility_flag`; the Node.js Bridge issues an IPC update that immediately rewrites `warehouse/processed/session_<session_id>.json` with the new flag (no separate save action), and the frontend hides/shows the corresponding MD block based on the state marker.  
 5. **Final Export**: The Exporter reads the selected MD blocks and physically merges them.
+
+### 3.4 Data Directory Roles
+
+The four data directories form a one-way pipeline: raw input → structured + mutable state → immutable per-Turn cache → final exportable artifact.
+
+| Directory | Owner | Mutability | Trigger |
+|---|---|---|---|
+| `data/0-raw/` | Google Takeout export (input) | read-only input | provided by the user |
+| `warehouse/processed/` | Parser (writes), Bridge IPC (updates `visibility_flag`) | mutable per-Session JSON | initial parse + each visibility toggle |
+| `warehouse/turns_md/` | Renderer | immutable content | first run (or any missing Turn) |
+| `exports/` | Exporter | overwritten on each export | user-triggered Organize action |
 
 ## 4. Coding — "How to write the code?"
 

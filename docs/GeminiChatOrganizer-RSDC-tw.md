@@ -72,7 +72,12 @@
 ### 2.7 UI 互動規則
 
 - **可見性切換**：即時更新 `visibility_flag`。  
-- **Markdown 渲染驅動**：UI 不直接解析 JSON 文本，而是讀取預先生成的 MD 檔案路徑進行渲染。
+- **Markdown 渲染驅動**：UI 不直接解析 JSON 文本，而是讀取預先生成的 MD 檔案路徑進行渲染。  
+- **整理動作 (Organize Action)**：使用者觸發的動作，將對話單元連同其當前可見的輪次，輸出為可分享或封存的 Markdown 文件。僅在使用者明確觸發時執行；系統不會隱式或排程匯出。互動流程：
+  - 使用者透過全域的「Organize all」控制項觸發動作。
+  - UI 在產出任何文件之前須先請求確認。
+  - 執行期間 UI 進入鎖定狀態；可見性切換與其他編輯動作在動作完成前皆被停用。
+  - 完成時 UI 報告產出文件的數量；若失敗則顯示錯誤並解除鎖定。
 
 ## 3. Design (設計) — 「系統如何架構？」
 
@@ -86,7 +91,7 @@
   - **Parser**：將原始數據轉為結構化 JSON 存於 `processed/`。  
   - **Renderer (`render_md_files.py`)**：**核心同步組件**。遍歷所有 Turn，將 Prompt 與 Response 渲染成獨立的 `.md` 檔案存放於快取目錄。  
   - **Exporter**：合併選定的 MD 快取，生成最終報告。  
-- **Local Repository**：本地數據倉庫。
+- **Local Repository**：本地數據倉庫。**可見性狀態歸屬**：每個輪次的 `visibility_flag` 與其他屬性一同儲存於對話單元 JSON 檔案 `warehouse/processed/session_<session_id>.json` 內。`warehouse/turns_md/` 下的 Per-Turn MD 快取僅為內容，**不**承載可見性狀態 — 它是 Renderer 的不可變輸出。
 
 ### 3.2 目錄結構
 
@@ -108,8 +113,19 @@ exports/             最終產出的 Markdown 檔案
 1. **啟動階段 (Startup)**：App 啟動，Node.js 即刻執行 `python engine/render_md.py`。  
 2. **預渲染 (Pre-rendering)**：`render_md.py` 檢查 `processed/` 數據，為每個 `turn_id` 在 `warehouse/turns_md/` 下產出對應的 `.md`。  
 3. **介面載入 (UI Loading)**：Node.js 將 MD 檔案清單與 Metadata 傳給前端，前端直接讀取 MD 內容顯示。  
-4. **互動切換**：使用者切換 `visibility_flag`，Node.js 更新 JSON 數據，前端根據狀態標記隱藏/顯示對應的 MD 區塊。  
+4. **互動切換**：使用者切換 `visibility_flag`，Node.js Bridge 透過 IPC 立即將新的旗標寫回 `warehouse/processed/session_<session_id>.json`（不需另行儲存），前端根據狀態標記隱藏/顯示對應的 MD 區塊。  
 5. **最終導出**：Exporter 讀取選定的 MD 區塊進行物理合併。
+
+### 3.4 資料目錄角色
+
+四個資料目錄形成一條單向管線：原始輸入 → 結構化且可變的狀態 → 不可變的逐 Turn 快取 → 最終可導出產物。
+
+| 目錄 | 所有者 | 可變性 | 觸發時機 |
+|---|---|---|---|
+| `data/0-raw/` | Google Takeout 匯出（輸入） | 唯讀輸入 | 由使用者提供 |
+| `warehouse/processed/` | Parser（寫入）、Bridge IPC（更新 `visibility_flag`） | 每個 Session JSON 可變 | 初次解析 + 每次切換可見性 |
+| `warehouse/turns_md/` | Renderer | 不可變內容 | 首次執行（或任何缺漏的 Turn） |
+| `exports/` | Exporter | 每次導出時覆寫 | 使用者觸發的 Organize 動作 |
 
 ## 4. Coding (實作規範) — 「程式碼怎麼寫？」
 
