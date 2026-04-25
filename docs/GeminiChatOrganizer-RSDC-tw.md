@@ -91,10 +91,11 @@
 - **可見性切換**：即時更新 `visibility_flag` 並反映在 UI 預覽。  
 - **多選模式 (Batch Select)**：支援批量選取 Session 進行 Topic 歸類。  
 - **主題導覽**：左側側邊欄顯示「主題」與「未分類 Session」。  
-- **整理動作 (Organize Action)**：  
-  - 產出文件前須先請求確認。  
-  - 執行期間 UI 鎖定。  
-  - 完成時報告產出文件數量。
+- **整理動作 (Organize Action)**：使用者觸發的動作，將對話單元連同其當前可見的輪次，輸出為可分享或封存的 Markdown 文件。沒有任何可見輪次的對話單元不會產生最終產物 (Final Artifact)。僅在使用者明確觸發時執行；系統不會隱式或排程匯出。互動流程：  
+  - 使用者透過全域的「Organize all」控制項觸發動作。  
+  - UI 在產出任何文件之前須先請求確認。  
+  - 執行期間 UI 進入鎖定狀態；可見性切換與其他編輯動作在動作完成前皆被停用。  
+  - 完成時 UI 報告產出文件的數量；若失敗則顯示錯誤並解除鎖定。
 
 ## 3. Design (設計) — 「系統如何架構？」
 
@@ -106,7 +107,7 @@
   - **Topic Manager**：處理 Topic 與 Session 的關聯讀寫。  
   - **Renderer**：生成 UI 用的單輪 MD 快取。  
   - **Exporter**：合併 MD 快取生成最終報告。  
-- **Local Repository**：`visibility_flag` 與狀態儲存於 `warehouse/processed/session_<id>.json`。
+- **Local Repository**：`visibility_flag` 與狀態儲存於 `warehouse/processed/session_<id>.json`。`warehouse/turns_md/` 下的 Per-Turn MD 快取僅為內容，**不**承載可見性狀態 — 它是 Renderer 的不可變輸出。
 
 ### 3.2 目錄結構
 
