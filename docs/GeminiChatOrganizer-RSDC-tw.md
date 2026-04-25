@@ -26,13 +26,23 @@
 - **脈絡保留**：強制紀錄每一輪對話的日期與時間戳。  
 - **標準化產出**：最終結果必須能轉化為符合業界標準的 Markdown 格式。
 
+### 1.5 主題聚合需求 (Topic Aggregation)
+
+- **碎片化問題**：自動切分的 Session 可能因暫時中斷而導致同一主題散落在多個 Session。  
+- **管理維度**：使用者需要從「時間線管理」提升到「專案/知識點管理」。
+
 ## 2. Specification (規格) — 「系統的規則是什麼？」
 
 ### 2.1 核心架構層級 (Hierarchy)
 
+#### 2.1.0 Topic (主題層)
+
+- **定義**：由使用者手動創建的邏輯容器，用於聚合一個或多個 Session。  
+- **屬性**：`topic_id`, `name`, `description`, `session_ids` (有序列表), `tags`, `created_at`。
+
 #### 2.1.1 Archive (封存區)
 
-- **定義**：系統最高的數據容器，儲存所有下載的歷史。
+- **定義**：系統最高的數據容器，儲存所有 Topic 與未分類的 Session。
 
 #### 2.1.2 Session (對話單元)
 
@@ -48,13 +58,14 @@
 
 - **Raw Source (原始源)**：Google Takeout 原始 JSON。  
 - **Processed JSON**：經 Parser 處理後的結構化數據。  
-- **UI MD Cache**：由 UI 渲染組件生成的單一輪次 Markdown 檔案，供 UI 讀取顯示。  
-- **Final Artifact**：使用者最後導出的合併 Markdown 檔案。
+- **Topic Metadata**：儲存於 `warehouse/topics/` 下的 JSON，定義 Session 映射關係。  
+- **UI MD Cache**：由 UI 渲染組件生成的單一輪次 Markdown 檔案。  
+- **Final Artifact**：使用者最後導出的合併 Markdown 檔案（以 Topic 或單一 Session 為單位）。
 
 ### 2.3 命名與數據結構
 
 - **時間戳規範**：統一使用 YYYY-MM-DD HH:mm:ss 格式。  
-- **狀態屬性**：每個對話輪次必須具備 `visibility_flag` 與 `timestamp` 屬性。
+- **狀態屬性**：每個輪次必須具備 `visibility_flag` 與 `timestamp` 屬性。
 
 ### 2.4 配置規範 (Config Schemas)
 
@@ -69,29 +80,33 @@
 
 - **首句擷取**：擷取該 Session 第一個 Turn 提問內容的前 20 個字元。
 
-### 2.7 UI 互動規則
+### 2.7 Topic 管理規則
 
-- **可見性切換**：即時更新 `visibility_flag`。  
-- **Markdown 渲染驅動**：UI 不直接解析 JSON 文本，而是讀取預先生成的 MD 檔案路徑進行渲染。  
-- **整理動作 (Organize Action)**：使用者觸發的動作，將對話單元連同其當前可見的輪次，輸出為可分享或封存的 Markdown 文件。沒有任何可見輪次的對話單元不會產生最終產物 (Final Artifact)。僅在使用者明確觸發時執行；系統不會隱式或排程匯出。互動流程：
-  - 使用者透過全域的「Organize all」控制項觸發動作。
-  - UI 在產出任何文件之前須先請求確認。
-  - 執行期間 UI 進入鎖定狀態；可見性切換與其他編輯動作在動作完成前皆被停用。
-  - 完成時 UI 報告產出文件的數量；若失敗則顯示錯誤並解除鎖定。
+- **手動歸位**：使用者可在 UI 勾選多個 Session 並點擊「Create Topic」或「Add to Topic」。  
+- **排序靈活性**：在 Topic 內部，使用者可以手動調整 Session 的先後順序。  
+- **解散與移動**：刪除 Topic 不會刪除 Session，僅解除關聯，將 Session 放回「未分類 (Uncategorized)」區域。
+
+### 2.8 UI 互動規則
+
+- **可見性切換**：即時更新 `visibility_flag` 並反映在 UI 預覽。  
+- **多選模式 (Batch Select)**：支援批量選取 Session 進行 Topic 歸類。  
+- **主題導覽**：左側側邊欄顯示「主題」與「未分類 Session」。  
+- **整理動作 (Organize Action)**：  
+  - 產出文件前須先請求確認。  
+  - 執行期間 UI 鎖定。  
+  - 完成時報告產出文件數量。
 
 ## 3. Design (設計) — 「系統如何架構？」
 
 ### 3.1 核心組件職責
 
-- **Node.js Bridge (橋接器)**：  
-  - **App 入口**：啟動時自動觸發 `render_md_files.py`。  
-  - **UI Server**：讀取 `warehouse/turns_md/` 下的檔案並回傳給網頁前端。  
-  - **生命週期管理**：監控 Python 進程狀態。  
-- **Python Processing Core (處理核心)**：  
-  - **Parser**：將原始數據轉為結構化 JSON 存於 `processed/`。  
-  - **Renderer (`render_md_files.py`)**：**核心同步組件**。遍歷所有 Turn，將 Prompt 與 Response 渲染成獨立的 `.md` 檔案存放於快取目錄。  
-  - **Exporter**：合併選定的 MD 快取，生成最終報告。  
-- **Local Repository**：本地數據倉庫。**可見性狀態歸屬**：每個輪次的 `visibility_flag` 與其他屬性一同儲存於對話單元 JSON 檔案 `warehouse/processed/session_<session_id>.json` 內。`warehouse/turns_md/` 下的 Per-Turn MD 快取僅為內容，**不**承載可見性狀態 — 它是 Renderer 的不可變輸出。
+- **Node.js Bridge**：入口管理、UI Server 提供、生命週期監控。  
+- **Python Processing Core**：  
+  - **Parser**：數據解析。  
+  - **Topic Manager**：處理 Topic 與 Session 的關聯讀寫。  
+  - **Renderer**：生成 UI 用的單輪 MD 快取。  
+  - **Exporter**：合併 MD 快取生成最終報告。  
+- **Local Repository**：`visibility_flag` 與狀態儲存於 `warehouse/processed/session_<id>.json`。
 
 ### 3.2 目錄結構
 
@@ -99,48 +114,53 @@
 ui/                  Node.js 前端代碼 (React/Vue/HTML)
 engine/              Python 核心邏輯
 ├── parser.py        解析 Takeout 數據
-├── render_md.py     (render_md_files.py) 生成 UI 用 MD 檔
+├── topic_mgr.py     管理主題邏輯
+├── render_md.py     生成 UI 用 MD 快取
 └── exporter.py      生成最終合併檔案
 warehouse/
-├── raw/             原始 JSON
-├── processed/       結構化 JSON (含 metadata)
+├── raw/             原始 JSON (Google Takeout)
+├── processed/       結構化 JSON (Session 數據與可見性旗標)
+├── topics/          主題定義 JSON (定義 Session 映射與順序)
 └── turns_md/        由 Renderer 生成的單一輪次 MD 檔案庫
 exports/             最終產出的 Markdown 檔案
 ```
 
 ### 3.3 執行流程
 
-1. **啟動階段 (Startup)**：App 啟動，Node.js 即刻執行 `python engine/render_md.py`。  
-2. **預渲染 (Pre-rendering)**：`render_md.py` 檢查 `processed/` 數據，為每個 `turn_id` 在 `warehouse/turns_md/` 下產出對應的 `.md`。  
-3. **介面載入 (UI Loading)**：Node.js 將 MD 檔案清單與 Metadata 傳給前端，前端直接讀取 MD 內容顯示。  
-4. **互動切換**：使用者切換 `visibility_flag`，Node.js Bridge 透過 IPC 立即將新的旗標寫回 `warehouse/processed/session_<session_id>.json`（不需另行儲存），前端根據狀態標記隱藏/顯示對應的 MD 區塊。  
-5. **最終導出**：Exporter 讀取選定的 MD 區塊進行物理合併。
+1. **啟動 (Startup)**：執行 `render_md.py` 確保快取同步。  
+2. **預渲染 (Pre-rendering)**：檢查 `processed/` 與 `turns_md/` 的同步狀態。  
+3. **載入 UI**：前端讀取 Metadata 與 MD 快取內容。  
+4. **狀態變更**：使用者操作 `visibility_flag` 或 Topic 歸類，立即寫回 JSON。  
+5. **最終導出**：Exporter 依序讀取各 Session/Turn 內容並物理合併。
 
 ### 3.4 資料目錄角色
 
-四個資料目錄形成一條單向管線：原始輸入 → 結構化且可變的狀態 → 不可變的逐 Turn 快取 → 最終可導出產物。
-
 | 目錄 | 所有者 | 可變性 | 觸發時機 |
-|---|---|---|---|
-| `data/0-raw/` | Google Takeout 匯出（輸入） | 唯讀輸入 | 由使用者提供 |
-| `warehouse/processed/` | Parser（寫入）、Bridge IPC（更新 `visibility_flag`） | 每個 Session JSON 可變 | 初次解析 + 每次切換可見性 |
-| `warehouse/turns_md/` | Renderer | 不可變內容 | 首次執行（或任何缺漏的 Turn） |
-| `exports/` | Exporter | 每次導出時覆寫 | 使用者觸發的 Organize 動作 |
+| :---- | :---- | :---- | :---- |
+| `data/raw/` | 使用者輸入 | 唯讀 | 初始導入 |
+| `warehouse/processed/` | Parser / Bridge | 狀態可變 | 初次解析 + 可見性切換 |
+| `warehouse/topics/` | Topic Manager | 高可變 | 使用者定義主題時 |
+| `warehouse/turns_md/` | Renderer | 內容不可變 | 內容變動或首次生成 |
 
-## 4. Coding (實作規範) — 「程式碼怎麼寫？」
+## 4. Coding (實作規範)
 
 ### 4.1 關鍵開發準則
 
-- **MD 為顯示基準**：UI 嚴禁自行實作 Markdown 轉 HTML 邏輯，必須讀取 Python 生成的 `.md` 檔案，以確保顯示與導出的一致性。  
-- **增量更新 (Incremental Rendering)**：`render_md.py` 應具備檢查機制，若 `processed/` 數據未變動且 MD 已存在，則跳過該輪次以加速啟動。  
-- **無損處理**：不得修改原始下載數據。
+- **MD 為顯示基準**：UI 必須讀取生成的 `.md` 檔案，確保顯示與導出一致。  
+- **增量更新**：`render_md.py` 檢查檔案雜湊或日期，避免重複渲染。  
+- **無損處理**：不得修改 `data/raw/` 下的原始數據。
 
-### 4.2 實作工具與庫
+### 4.2 實作工具
 
-- **Node.js**：`child_process.spawnSync` (用於啟動時的渲染同步) 或 `spawn`。  
-- **Python**：pathlib 處理 MD 檔案路徑，jinja2 作為 MD 渲染引擎（定義 Prompt/Response 的佈局）。
+- **Node.js**：`child_process.spawn` 調用 Python 核心。  
+- **Python**：pathlib 處理路徑，jinja2 作為 MD 渲染引擎。
 
 ### 4.3 安全與健壯性
 
-- **檔案命名安全**：`turns_md/` 下的檔案應以 `turn_id` 命名，避免特殊字元導致讀取失敗。  
-- **啟動阻塞控制**：若對話量極大，啟動渲染應採用非同步分段載入，或顯示進度條防止 UI 凍結。
+- **檔案命名**：使用 ID 命名，避免特殊字元。  
+- **阻塞控制**：大批量渲染時應提供異步回饋或進度條。
+
+### 4.4 Topic 實作細節
+
+- **ID 生成**：建議 `topic_YYYYMMDD_random`。  
+- **層級標題**：Topic 匯出時，Session 標題應作為二級標題（`## Session: [Title]`）。
