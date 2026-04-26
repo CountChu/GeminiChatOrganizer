@@ -19,7 +19,7 @@
     </div>
   </header>
   <main>
-    <aside id="sessions-pane">
+    <aside id="uncat-pane" class="sidebar">
       <div id="sessions-toolbar">
         <input id="search" type="search" placeholder="filter sessions…" />
         <button id="sort-btn" title="Toggle session sort order">Time ↑</button>
@@ -31,22 +31,22 @@
         <button id="ms-remove" title="Remove selection from its Topic" hidden>− Topic</button>
         <button id="ms-clear" title="Clear selection">×</button>
       </div>
-      <div id="sidebar-tree">
-        <section class="sidebar-group" id="topics-group">
-          <header class="group-header">
-            <span class="group-title">Topics</span>
-            <span class="group-count" id="topics-count">0</span>
-          </header>
-          <div class="group-body" id="topics-body"></div>
-        </section>
-        <section class="sidebar-group" id="uncat-group">
-          <header class="group-header">
-            <span class="group-title">Uncategorized</span>
-            <span class="group-count" id="uncat-count">0</span>
-          </header>
-          <ul class="group-list" id="uncat-list"></ul>
-        </section>
-      </div>
+      <section class="sidebar-group" id="uncat-group">
+        <header class="group-header">
+          <span class="group-title">Uncategorized</span>
+          <span class="group-count" id="uncat-count">0</span>
+        </header>
+        <ul class="group-list" id="uncat-list"></ul>
+      </section>
+    </aside>
+    <aside id="topics-pane" class="sidebar">
+      <section class="sidebar-group" id="topics-group">
+        <header class="group-header">
+          <span class="group-title">Topics</span>
+          <span class="group-count" id="topics-count">0</span>
+        </header>
+        <div class="group-body" id="topics-body"></div>
+      </section>
     </aside>
     <section id="turns-pane">
       <div id="turns-empty">Select a session or topic on the left.</div>

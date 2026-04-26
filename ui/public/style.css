@@ -7,14 +7,13 @@ header h1 { margin: 0; font-size: 16px; font-weight: 600; }
 .actions button { padding: 6px 12px; border: 1px solid #ccc; background: #fff; border-radius: 4px; cursor: pointer; }
 .actions button:hover { background: #f0f0f0; }
 #status { color: #666; font-size: 12px; }
-main { display: grid; grid-template-columns: 320px 1fr; height: calc(100vh - 51px); }
-#sessions-pane { border-right: 1px solid #e2e2e2; background: #fff; display: flex; flex-direction: column; overflow: hidden; }
+main { display: grid; grid-template-columns: 300px 280px 1fr; height: calc(100vh - 51px); }
+.sidebar { border-right: 1px solid #e2e2e2; background: #fff; display: flex; flex-direction: column; overflow: hidden; }
 #sessions-toolbar { display: flex; gap: 6px; padding: 8px; align-items: center; }
 #sessions-toolbar #search { flex: 1; margin: 0; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; }
 #sessions-toolbar #sort-btn { padding: 6px 10px; border: 1px solid #ccc; background: #fff; border-radius: 4px; cursor: pointer; white-space: nowrap; font-size: 12px; }
 #sessions-toolbar #sort-btn:hover { background: #f0f0f0; }
-#sidebar-tree { flex: 1; overflow-y: auto; }
-.sidebar-group { border-bottom: 1px solid #eee; }
+.sidebar-group { flex: 1; min-height: 0; overflow-y: auto; }
 .sidebar-group .group-header { display: flex; justify-content: space-between; align-items: center; padding: 6px 12px; background: #f3f4f6; border-bottom: 1px solid #e2e2e2; font-size: 11px; font-weight: 600; text-transform: uppercase; color: #555; letter-spacing: 0.5px; position: sticky; top: 0; }
 .sidebar-group .group-count { background: #ddd; color: #333; font-size: 11px; padding: 1px 6px; border-radius: 8px; font-weight: 500; }
 .group-list, .group-list.nested { list-style: none; margin: 0; padding: 0; }
