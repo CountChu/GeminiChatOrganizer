@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Literal
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -42,3 +42,20 @@ class SessionSummary(BaseModel):
     last_active_time: str
     turn_count: int
     visible_count: int
+    topic_id: Optional[str] = None
+
+
+class Topic(BaseModel):
+    topic_id: str
+    name: str
+    description: str = ""
+    session_ids: List[str] = Field(default_factory=list)
+    tags: List[str] = Field(default_factory=list)
+    created_at: str  # YYYY-MM-DD HH:mm:ss
+
+
+class TopicSummary(BaseModel):
+    topic_id: str
+    name: str
+    session_count: int
+    created_at: str

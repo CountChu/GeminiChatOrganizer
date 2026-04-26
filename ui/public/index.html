@@ -24,10 +24,46 @@
         <input id="search" type="search" placeholder="filter sessions…" />
         <button id="sort-btn" title="Toggle session sort order">Time ↑</button>
       </div>
-      <ul id="sessions-list"></ul>
+      <div id="multi-select-bar" hidden>
+        <span id="ms-count">0 selected</span>
+        <button id="ms-create" title="Create a new Topic from selection">+ Topic</button>
+        <select id="ms-add" title="Add selection to an existing Topic"><option value="">Add to…</option></select>
+        <button id="ms-remove" title="Remove selection from its Topic" hidden>− Topic</button>
+        <button id="ms-clear" title="Clear selection">×</button>
+      </div>
+      <div id="sidebar-tree">
+        <section class="sidebar-group" id="topics-group">
+          <header class="group-header">
+            <span class="group-title">Topics</span>
+            <span class="group-count" id="topics-count">0</span>
+          </header>
+          <div class="group-body" id="topics-body"></div>
+        </section>
+        <section class="sidebar-group" id="uncat-group">
+          <header class="group-header">
+            <span class="group-title">Uncategorized</span>
+            <span class="group-count" id="uncat-count">0</span>
+          </header>
+          <ul class="group-list" id="uncat-list"></ul>
+        </section>
+      </div>
     </aside>
     <section id="turns-pane">
-      <div id="turns-empty">Select a session on the left.</div>
+      <div id="turns-empty">Select a session or topic on the left.</div>
+      <div id="topic-content" hidden>
+        <div class="topic-head">
+          <h2 id="topic-title"></h2>
+          <button class="icon-btn" id="topic-rename" title="Rename Topic">✎</button>
+        </div>
+        <div id="topic-meta"></div>
+        <textarea id="topic-description" rows="2" placeholder="Description (optional)"></textarea>
+        <div class="topic-actions">
+          <button id="topic-organize">Organize this Topic</button>
+          <button id="topic-delete" class="danger">Delete Topic</button>
+        </div>
+        <h3>Sessions in this Topic</h3>
+        <ol id="topic-sessions"></ol>
+      </div>
       <div id="turns-content" hidden>
         <h2 id="session-title"></h2>
         <div id="session-meta"></div>

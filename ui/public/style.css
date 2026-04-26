@@ -13,16 +13,61 @@ main { display: grid; grid-template-columns: 320px 1fr; height: calc(100vh - 51p
 #sessions-toolbar #search { flex: 1; margin: 0; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; }
 #sessions-toolbar #sort-btn { padding: 6px 10px; border: 1px solid #ccc; background: #fff; border-radius: 4px; cursor: pointer; white-space: nowrap; font-size: 12px; }
 #sessions-toolbar #sort-btn:hover { background: #f0f0f0; }
-#sessions-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
-#sessions-list li { padding: 8px 12px; border-bottom: 1px solid #f0f0f0; cursor: pointer; }
-#sessions-list li:hover { background: #f6f6f6; }
-#sessions-list li.active { background: #e8f0fe; }
+#sidebar-tree { flex: 1; overflow-y: auto; }
+.sidebar-group { border-bottom: 1px solid #eee; }
+.sidebar-group .group-header { display: flex; justify-content: space-between; align-items: center; padding: 6px 12px; background: #f3f4f6; border-bottom: 1px solid #e2e2e2; font-size: 11px; font-weight: 600; text-transform: uppercase; color: #555; letter-spacing: 0.5px; position: sticky; top: 0; }
+.sidebar-group .group-count { background: #ddd; color: #333; font-size: 11px; padding: 1px 6px; border-radius: 8px; font-weight: 500; }
+.group-list, .group-list.nested { list-style: none; margin: 0; padding: 0; }
+.group-list.nested { padding-left: 16px; }
+.session-row { display: flex; align-items: flex-start; gap: 8px; padding: 6px 10px; border-bottom: 1px solid #f0f0f0; cursor: pointer; }
+.session-row:hover { background: #f6f6f6; }
+.session-row.active { background: #e8f0fe; }
+.session-row .session-check { margin-top: 3px; flex-shrink: 0; }
+.session-row .session-text { min-width: 0; flex: 1; }
 .session-title { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .session-meta { color: #888; font-size: 12px; }
+.topic-row { padding: 0 0 4px 0; }
+.topic-row.active .topic-head-row { background: #ddebff; color: #1a5dad; }
+.topic-head-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 12px; cursor: pointer; font-weight: 600; color: #214d8b; }
+.topic-head-row:hover { background: #eef3fa; }
+.topic-head-row .topic-count { background: #cdd9eb; color: #214d8b; font-size: 11px; padding: 1px 6px; border-radius: 8px; }
+
+#multi-select-bar { display: flex; align-items: center; gap: 6px; padding: 6px 10px; background: #fff7d6; border-bottom: 1px solid #f0d97a; font-size: 12px; }
+#multi-select-bar #ms-count { color: #6b5b00; font-weight: 600; flex: 1; min-width: 0; }
+#multi-select-bar button, #multi-select-bar select { font-size: 12px; padding: 4px 8px; border: 1px solid #d0c060; background: #fff; border-radius: 3px; cursor: pointer; }
+#multi-select-bar button:hover, #multi-select-bar select:hover { background: #fffbe5; }
+#multi-select-bar #ms-clear { padding: 4px 7px; }
+
+#multi-select-bar[hidden] { display: none; }
 #turns-pane { padding: 16px 24px; overflow-y: auto; }
 #turns-empty { color: #888; padding: 40px; text-align: center; }
 #session-title { margin: 0 0 4px 0; }
 #session-meta { color: #888; font-size: 12px; margin-bottom: 16px; }
+
+#topic-content .topic-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+#topic-content #topic-title { margin: 0; }
+#topic-content .icon-btn { border: 1px solid #ccc; background: #fff; cursor: pointer; padding: 2px 8px; border-radius: 4px; font-size: 13px; }
+#topic-content .icon-btn:hover { background: #f0f0f0; }
+#topic-content #topic-meta { color: #888; font-size: 12px; margin-bottom: 8px; }
+#topic-content #topic-description { width: 100%; padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; font: inherit; font-size: 13px; resize: vertical; margin-bottom: 12px; }
+#topic-content .topic-actions { display: flex; gap: 8px; margin-bottom: 24px; }
+#topic-content .topic-actions button { padding: 6px 12px; border: 1px solid #ccc; background: #fff; border-radius: 4px; cursor: pointer; }
+#topic-content .topic-actions button:hover { background: #f0f0f0; }
+#topic-content .topic-actions .danger { border-color: #e3a8a8; color: #8b1f1f; }
+#topic-content .topic-actions .danger:hover { background: #fdecea; }
+#topic-content h3 { margin: 16px 0 8px; font-size: 14px; color: #555; }
+#topic-sessions { margin: 0; padding: 0; list-style: none; }
+.topic-session-row { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid #eee; border-radius: 6px; margin-bottom: 6px; background: #fff; }
+.topic-session-row .reorder { display: flex; flex-direction: column; gap: 2px; }
+.topic-session-row .reorder button { font-size: 11px; padding: 1px 6px; line-height: 1; border: 1px solid #ccc; background: #fff; cursor: pointer; border-radius: 3px; }
+.topic-session-row .reorder button:disabled { opacity: 0.3; cursor: default; }
+.topic-session-row .ts-text { flex: 1; min-width: 0; }
+.topic-session-row .ts-title { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.topic-session-row .ts-meta { color: #888; font-size: 12px; }
+.topic-session-row .ts-open, .topic-session-row .ts-remove { font-size: 12px; padding: 4px 8px; border: 1px solid #ccc; background: #fff; cursor: pointer; border-radius: 3px; }
+.topic-session-row .ts-open:hover { background: #f0f0f0; }
+.topic-session-row .ts-remove { border-color: #e3a8a8; color: #8b1f1f; }
+.topic-session-row .ts-remove:hover { background: #fdecea; }
 .turn { border: 1px solid #e0e0e0; background: #fff; border-radius: 6px; margin-bottom: 12px; padding: 12px 14px; }
 .turn.hidden { opacity: 0.5; background: #f6f6f6; }
 .turn-head { display: flex; justify-content: flex-start; align-items: center; margin-bottom: 6px; gap: 12px; }

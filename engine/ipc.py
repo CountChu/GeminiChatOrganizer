@@ -6,8 +6,9 @@ import traceback
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
+from . import topic_mgr
 from .exporter import export_archive, load_session, load_template_config
-from .models import Session, SessionSummary
+from .models import Session, SessionSummary, Topic, TopicSummary
 from .parser import merge_visibility, parse_archive, write_processed
 from .render_md import render_all
 
@@ -18,6 +19,7 @@ class State:
         raw_dir: Path,
         processed_dir: Path,
         turns_md_dir: Path,
+        topics_dir: Path,
         exports_dir: Path,
         gap_seconds: int,
         template_path: Path,
@@ -25,6 +27,7 @@ class State:
         self.raw_dir = raw_dir
         self.processed_dir = processed_dir
         self.turns_md_dir = turns_md_dir
+        self.topics_dir = topics_dir
         self.exports_dir = exports_dir
         self.gap_seconds = gap_seconds
         self.template_path = template_path
@@ -61,7 +64,7 @@ class State:
                     break
 
 
-def _summary(s: Session) -> SessionSummary:
+def _summary(s: Session, topic_id: Optional[str]) -> SessionSummary:
     visible = sum(1 for t in s.turns if t.visibility_flag)
     return SessionSummary(
         session_id=s.session_id,
@@ -70,12 +73,20 @@ def _summary(s: Session) -> SessionSummary:
         last_active_time=s.last_active_time,
         turn_count=s.turn_count,
         visible_count=visible,
+        topic_id=topic_id,
     )
 
 
+def _topic_summary(t: Topic) -> TopicSummary:
+    return TopicSummary(topic_id=t.topic_id, name=t.name, session_count=len(t.session_ids), created_at=t.created_at)
+
+
+# ---------- session commands ----------
+
 def cmd_list_sessions(state: State, _args: dict) -> dict:
     sessions = state.ensure_loaded()
-    return {"sessions": [_summary(s).model_dump() for s in sessions]}
+    membership = topic_mgr.session_to_topic_map(topic_mgr.load_topics(state.topics_dir))
+    return {"sessions": [_summary(s, membership.get(s.session_id)).model_dump() for s in sessions]}
 
 
 def cmd_get_session(state: State, args: dict) -> dict:
@@ -100,11 +111,93 @@ def cmd_toggle_turn(state: State, args: dict) -> dict:
     return {"session_id": sid, "turn_id": tid, "visible": visible}
 
 
+# ---------- topic commands ----------
+
+def cmd_list_topics(state: State, _args: dict) -> dict:
+    topics = topic_mgr.load_topics(state.topics_dir)
+    return {"topics": [_topic_summary(t).model_dump() for t in topics]}
+
+
+def cmd_get_topic(state: State, args: dict) -> dict:
+    tid = args["topic_id"]
+    topic = topic_mgr.load_topic(state.topics_dir, tid)
+    sessions = {s.session_id: s for s in state.ensure_loaded()}
+    membership = topic_mgr.session_to_topic_map(topic_mgr.load_topics(state.topics_dir))
+    members = []
+    for sid in topic.session_ids:
+        s = sessions.get(sid)
+        if s is None:
+            continue
+        members.append(_summary(s, membership.get(sid)).model_dump())
+    return {"topic": topic.model_dump(), "sessions": members}
+
+
+def cmd_create_topic(state: State, args: dict) -> dict:
+    name = args.get("name", "")
+    sids = list(args.get("session_ids") or [])
+    description = args.get("description", "") or ""
+    tags = list(args.get("tags") or [])
+    topic = topic_mgr.create_topic(state.topics_dir, name=name, session_ids=sids, description=description, tags=tags)
+    return {"topic": topic.model_dump()}
+
+
+def cmd_update_topic(state: State, args: dict) -> dict:
+    tid = args["topic_id"]
+    patch = args.get("patch") or {}
+    topic = topic_mgr.update_topic(
+        state.topics_dir,
+        tid,
+        name=patch.get("name"),
+        description=patch.get("description"),
+        tags=patch.get("tags"),
+    )
+    return {"topic": topic.model_dump()}
+
+
+def cmd_delete_topic(state: State, args: dict) -> dict:
+    tid = args["topic_id"]
+    topic_mgr.delete_topic(tid, state.topics_dir)
+    return {"topic_id": tid, "deleted": True}
+
+
+def cmd_add_sessions_to_topic(state: State, args: dict) -> dict:
+    tid = args["topic_id"]
+    sids = list(args.get("session_ids") or [])
+    topic = topic_mgr.add_sessions(state.topics_dir, tid, sids)
+    return {"topic": topic.model_dump()}
+
+
+def cmd_remove_sessions_from_topic(state: State, args: dict) -> dict:
+    tid = args["topic_id"]
+    sids = list(args.get("session_ids") or [])
+    topic = topic_mgr.remove_sessions(state.topics_dir, tid, sids)
+    return {"topic": topic.model_dump()}
+
+
+def cmd_reorder_topic_sessions(state: State, args: dict) -> dict:
+    tid = args["topic_id"]
+    sids = list(args.get("session_ids") or [])
+    topic = topic_mgr.reorder_sessions(state.topics_dir, tid, sids)
+    return {"topic": topic.model_dump()}
+
+
+# ---------- export ----------
+
 def cmd_export(state: State, args: dict) -> dict:
-    only = args.get("session_ids")
+    only_session_ids = args.get("session_ids")
+    only_topic_ids = args.get("topic_ids")
     template_cfg = load_template_config(state.template_path)
     sessions = state.ensure_loaded()
-    written = export_archive(sessions, template_cfg, state.exports_dir, state.turns_md_dir, only_ids=only)
+    topics = topic_mgr.load_topics(state.topics_dir)
+    written = export_archive(
+        sessions,
+        template_cfg,
+        state.exports_dir,
+        state.turns_md_dir,
+        only_session_ids=only_session_ids,
+        topics=topics,
+        only_topic_ids=only_topic_ids,
+    )
     return {"files": [str(p) for p in written]}
 
 
@@ -121,6 +214,14 @@ COMMANDS: Dict[str, Callable[[State, dict], dict]] = {
     "list_sessions": cmd_list_sessions,
     "get_session": cmd_get_session,
     "toggle_turn": cmd_toggle_turn,
+    "list_topics": cmd_list_topics,
+    "get_topic": cmd_get_topic,
+    "create_topic": cmd_create_topic,
+    "update_topic": cmd_update_topic,
+    "delete_topic": cmd_delete_topic,
+    "add_sessions_to_topic": cmd_add_sessions_to_topic,
+    "remove_sessions_from_topic": cmd_remove_sessions_from_topic,
+    "reorder_topic_sessions": cmd_reorder_topic_sessions,
     "export": cmd_export,
     "reload": cmd_reload,
     "shutdown": cmd_shutdown,

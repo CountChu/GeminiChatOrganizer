@@ -4,6 +4,7 @@ __pycache__/
 node_modules/
 warehouse/processed/
 warehouse/turns_md/
+warehouse/topics/
 exports/
 .DS_Store
 data

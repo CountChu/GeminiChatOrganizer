@@ -6,6 +6,7 @@ from pathlib import Path
 
 import yaml
 
+from . import topic_mgr
 from .exporter import export_archive, load_all_sessions, load_template_config
 from .ipc import State, serve
 from .parser import merge_visibility, parse_archive, write_processed
@@ -21,6 +22,7 @@ def _state_from_args(args: argparse.Namespace) -> State:
     raw_dir = Path(args.raw_dir or cfg.get("raw_dir"))
     processed_dir = Path(args.processed_dir or cfg.get("processed_dir", "warehouse/processed"))
     turns_md_dir = Path(args.turns_md_dir or cfg.get("turns_md_dir", "warehouse/turns_md"))
+    topics_dir = Path(args.topics_dir or cfg.get("topics_dir", "warehouse/topics"))
     exports_dir = Path(args.exports_dir or cfg.get("exports_dir", "exports"))
     gap = int(args.gap_seconds or cfg.get("session_gap_seconds", 1800))
     template_path = Path(args.template or "export_template.yaml")
@@ -28,6 +30,7 @@ def _state_from_args(args: argparse.Namespace) -> State:
         raw_dir=raw_dir,
         processed_dir=processed_dir,
         turns_md_dir=turns_md_dir,
+        topics_dir=topics_dir,
         exports_dir=exports_dir,
         gap_seconds=gap,
         template_path=template_path,
@@ -58,7 +61,16 @@ def cmd_export(args: argparse.Namespace) -> int:
     state = _state_from_args(args)
     template_cfg = load_template_config(state.template_path)
     sessions = load_all_sessions(state.processed_dir)
-    written = export_archive(sessions, template_cfg, state.exports_dir, state.turns_md_dir, only_ids=args.session_ids)
+    topics = topic_mgr.load_topics(state.topics_dir)
+    written = export_archive(
+        sessions,
+        template_cfg,
+        state.exports_dir,
+        state.turns_md_dir,
+        only_session_ids=args.session_ids,
+        topics=topics,
+        only_topic_ids=args.topic_ids,
+    )
     print(f"exported: {len(written)} files into {state.exports_dir}", file=sys.stderr)
     return 0
 
@@ -78,6 +90,7 @@ def main(argv=None) -> int:
     common.add_argument("--raw-dir", dest="raw_dir")
     common.add_argument("--processed-dir", dest="processed_dir")
     common.add_argument("--turns-md-dir", dest="turns_md_dir")
+    common.add_argument("--topics-dir", dest="topics_dir")
     common.add_argument("--exports-dir", dest="exports_dir")
     common.add_argument("--gap-seconds", dest="gap_seconds", type=int)
     common.add_argument("--template", default="export_template.yaml")
@@ -90,6 +103,7 @@ def main(argv=None) -> int:
 
     p_export = sub.add_parser("export", parents=[common])
     p_export.add_argument("--session-ids", nargs="*")
+    p_export.add_argument("--topic-ids", nargs="*")
     p_export.set_defaults(func=cmd_export)
 
     p_serve = sub.add_parser("serve", parents=[common])

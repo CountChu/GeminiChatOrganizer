@@ -59,7 +59,31 @@ app.get("/api/sessions/:id", asHandler(async (req) => bridge.send("get_session",
 app.post("/api/sessions/:id/turns/:tid/visibility", asHandler(async (req) =>
   bridge.send("toggle_turn", { session_id: req.params.id, turn_id: req.params.tid, visible: !!req.body.visible })
 ));
-app.post("/api/export", asHandler(async (req) => bridge.send("export", { session_ids: req.body?.session_ids || null })));
+
+app.get("/api/topics", asHandler(async () => bridge.send("list_topics", {})));
+app.post("/api/topics", asHandler(async (req) => bridge.send("create_topic", {
+  name: req.body?.name || "",
+  session_ids: req.body?.session_ids || [],
+  description: req.body?.description || "",
+  tags: req.body?.tags || [],
+})));
+app.get("/api/topics/:id", asHandler(async (req) => bridge.send("get_topic", { topic_id: req.params.id })));
+app.patch("/api/topics/:id", asHandler(async (req) => bridge.send("update_topic", { topic_id: req.params.id, patch: req.body || {} })));
+app.delete("/api/topics/:id", asHandler(async (req) => bridge.send("delete_topic", { topic_id: req.params.id })));
+app.post("/api/topics/:id/sessions", asHandler(async (req) => bridge.send("add_sessions_to_topic", {
+  topic_id: req.params.id, session_ids: req.body?.session_ids || [],
+})));
+app.delete("/api/topics/:id/sessions", asHandler(async (req) => bridge.send("remove_sessions_from_topic", {
+  topic_id: req.params.id, session_ids: req.body?.session_ids || [],
+})));
+app.put("/api/topics/:id/order", asHandler(async (req) => bridge.send("reorder_topic_sessions", {
+  topic_id: req.params.id, session_ids: req.body?.session_ids || [],
+})));
+
+app.post("/api/export", asHandler(async (req) => bridge.send("export", {
+  session_ids: req.body?.session_ids || null,
+  topic_ids: req.body?.topic_ids || null,
+})));
 app.post("/api/reload", asHandler(async () => bridge.send("reload", {})));
 app.get("/api/lock", (_req, res) => res.json({ locked: bridge.exportInFlight }));
 
