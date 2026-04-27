@@ -1,167 +1,230 @@
 # Gemini Chat Organizer RSDC Specification Document
 
-This document defines the development framework for the "Gemini Chat Organizer," aimed at transforming raw AI conversations into structured, high-value knowledge assets.
+This document defines the development framework for the "Gemini Chat Organizer," aimed at transforming raw AI conversations into structured, high-value knowledge documents.
 
 ## 1. Requirements — "What problems are we solving?"
 
 ### 1.1 Target Users
 
-- Professional users who frequently interact with Gemini and need to transform conversation content into reports, notes, or development logs.  
-- Users who wish to preserve and manage all AI history records locally.
+- Professional users who frequently interact with Gemini and need to turn conversation content into reports, notes, or development logs.
+- Users who want to preserve and manage all AI history records locally.
 
 ### 1.2 Core Vision
 
-- To eliminate noise from conversations, elevating AI dialogue from a "procedural tool" to a "knowledge asset," while providing full-process digital provenance.
+- Eliminate noise from conversations, elevating AI dialogue from a "procedural tool" to a "knowledge asset," and provide full-process digital provenance.
 
 ### 1.3 Current Pain Points
 
-- **Excessive Procedural Noise**: Conversations often contain multiple error-correction cycles and repetitive attempts ("procedural prompts"). Exporting them directly leads to blurred focus.  
-- **Lack of Local Backup**: Cloud conversation search is inconvenient, and once a chat is deleted in the web UI it cannot be recovered.  
-- **Missing Metadata**: Exported text often lacks precise timestamps, making it difficult to reconstruct the context of thought.
+- **Excessive Procedural Noise**: Conversations often contain repeated error-correction cycles and retries ("procedural prompts"). Exporting them directly blurs the focus.
+- **Lack of Local Backup**: Cloud conversation search is inconvenient, and once a chat is deleted in the web UI it cannot be recovered.
+- **Missing Metadata**: Exported text often lacks precise prompt timestamps, making it hard to reconstruct the original line of thought.
 
 ### 1.4 System Goals
 
-- **Full Download and Backup**: Support complete mirroring of cloud conversations to a local path, with a "local-first" storage model.  
-- **Precise Filtering**: Provide an interface for users to filter (hide/show) specific conversation blocks.  
-- **Context Preservation**: Mandatory recording of the date and timestamp for every conversation turn.  
-- **Standardized Output**: Final results must be convertible into industry-standard Markdown format.
+- **Full Download and Backup**: Mirror cloud conversations completely to a local path, with a "local-first" storage model.
+- **Precise Filtering**: Provide an interface for users to filter (hide/show) specific conversation blocks.
+- **Context Preservation**: Mandatory recording of the date and timestamp for every conversation turn.
+- **Standardized Output**: Final results must be convertible into industry-standard Markdown.
 
 ### 1.5 Topic Aggregation
 
-- **Fragmentation Problem**: Auto-segmented Sessions can scatter the same topic across multiple Sessions due to temporary interruptions.  
+- **Fragmentation Problem**: Auto-segmented Sessions can scatter the same topic across multiple Sessions due to temporary interruptions.
 - **Management Dimension**: Users need to evolve from "timeline-based management" to "project / knowledge-point management."
 
 ## 2. Specification — "What are the rules of the system?"
 
-### 2.1 Hierarchy
+### 2.1 Data Hierarchy
 
-#### 2.1.0 Topic
+#### Data - topic
 
-- **Definition**: A logical container, manually created by the user, that aggregates one or more Sessions.  
-- **Attributes**: `topic_id`, `name`, `description`, `session_ids` (ordered list), `tags`, `created_at`.
+**Definition**: A logical container, manually created by the user, that aggregates one or more Sessions.
 
-#### 2.1.1 Archive
+**Syntax**
 
-- **Definition**: The top-level data container, storing all Topics together with uncategorized Sessions.
+```
+topic = {topicId, name, description, sessionIds, tags, created, updated}
+sessionIds = [sessionId]
+```
 
-#### 2.1.2 Session
+**Fields**
 
-- **Definition**: A chain of conversation topics continuous in semantics or time.  
-- **Attributes**: `session_id`, `title`, `turns` list, `start_time`, `last_active_time`.
+- `sessionIds`: Ordered list that determines the order of Sessions on export.
 
-#### 2.1.3 Turn
+**Example**
 
-- **Definition**: The smallest logical interaction unit in the system.  
-- **Attributes**: `turn_id`, `prompt`, `response`, `timestamp`, `visibility_flag`.
+```json
+{
+  "topicId": "topic_20260426_9b10f5",
+  "name": "B 投資決策的關鍵解答",
+  "description": "",
+  "sessionIds": [
+    "S1759563327",
+    "S1759689500",
+    "S1759773999"
+  ],
+  "tags": [],
+  "created": "2026-04-26 07:22:59",
+  "updated": "2026-04-26 08:33:59"
+}
+```
 
-### 2.2 Artifact Types and Flow
+#### Data - archive
 
-- **Raw Source**: Raw JSON from Google Takeout.  
-- **Processed JSON**: Structured data produced by the Parser.  
-- **Topic Metadata**: JSON stored under `warehouse/topics/`, defining Session-mapping relationships.  
-- **UI MD Cache**: Per-Turn Markdown files generated by the UI rendering component.  
-- **Final Artifact**: The merged Markdown document the user finally exports (per Topic or per single Session).
+**Definition**: The top-level data container, storing all Topics together with uncategorized Sessions.
 
-### 2.3 Naming and Data Structure
+#### Data - session
 
-- **Timestamp Standard**: Uniformly use the YYYY-MM-DD HH:mm:ss format.  
-- **State Attributes**: Each Turn must possess a `visibility_flag` and a `timestamp` attribute.
+**Definition**: A chain of conversation topics continuous in semantics or in time.
 
-### 2.4 Config Schemas
+**Syntax**
 
-- `sync_config.yaml`: Defines `session_gap_seconds` (default 1800 s).  
-- `export_template.yaml`: Defines the Markdown output style.
+```
+session = {sessionId, title, beginTime, endTime, turns}
+turns = [turn]
+```
 
-### 2.5 Session Inference Rule
+**Fields**
 
-- **Time-Gap Heuristic**: Adjacent Turns separated by more than 30 minutes are split into different Sessions.
+- `sessionId`: Unique identifier.
+- `title`: Session title, generated by default from an excerpt of the first prompt.
 
-### 2.6 Automatic Title Generation
+#### Data - turn
 
-- **First-Prompt Excerpt**: Take the first 20 characters of the first Turn's prompt in the Session as its title.
+**Definition**: The smallest logical interaction unit in the system.
 
-### 2.7 Topic Management Rules
+**Syntax**
 
-- **Manual Assignment**: The user multi-selects Sessions in the UI and clicks "Create Topic" or "Add to Topic."  
-- **Reordering Flexibility**: Within a Topic, the user can manually adjust the order of its Sessions.  
-- **Dissolution and Movement**: Deleting a Topic does not delete its Sessions; it only releases the association, returning the Sessions to the "Uncategorized" area.
+```
+turn = {turnId, timestamp, timestampUtc, kind, prompt, response, attachments, visibilityFlag}
+```
 
-### 2.8 UI Interaction Rules
+**Naming and Data-Structure Rules**
 
-- **Visibility Toggle**: Updates `visibility_flag` in real time and reflects the change in the UI preview.  
-- **Batch Select**: Supports multi-selection of Sessions for Topic categorization.  
-- **Topic Navigation**: The left sidebar displays "Topics" and "Uncategorized Sessions."  
-- **Organize Action**: A user-initiated action that materializes Sessions, with only their currently visible Turns, as Markdown documents for sharing or archival. Sessions with no visible Turns produce no Final Artifact. Triggered on demand only; the system performs no implicit or scheduled exports. The interaction flow:  
-  - The user invokes the global "Organize all" control.  
-  - The UI requests confirmation before producing any output.  
-  - During execution the UI enters a locked state; visibility toggles and other edits are disabled until the action completes.  
-  - On completion the UI reports the number of artifacts produced; on failure it surfaces the error and releases the lock.
+- **Timestamp Format**: Uniformly use the `YYYY-MM-DD HH:mm:ss` format.
+- **State Attributes**: Each Turn must carry a `visibilityFlag` (Boolean) and a `timestamp` attribute.
+
+### 2.2 Configurations
+
+System behavior and the data flow (Artifacts) are governed by two core YAML files:
+
+#### Config - sync_config.yaml
+
+Defines system paths, data mappings, and parsing rules.
+
+```yaml
+rawDir: "data/0-raw/Gemini Apps 260424"
+sessionsDir: "data/1-sessions"
+turnsMdDir: "data/2-turns_md"
+topicsDir: "data/3-topics"
+exportsDir: "data/4-exports"
+sessionGapSeconds: 1800
+```
+
+#### Config - export_template.yaml
+
+Defines the layout, appearance, and naming rules used by the Exporter when producing the final document.
+
+```yaml
+timestamp_in_header: true
+turn_separator: "\n\n---\n\n"
+filename_pattern: "{date}_{sid}_{slug}.md"
+topic_filename_pattern: "{date}_{topic_id}_{slug}.md"
+slug_max_chars: 40
+session_header: "# {{ title }}"
+topic_session_header: "## Session: {{ title }}"
+turn_header: "## {{ timestamp }} — {{ prompt_preview }}"
+prompt_block: "**Prompt:**\n\n{{ prompt }}"
+response_block: "**Response:**\n\n{{ response_md }}"
+```
+
+### 2.3 Data Flow & Logic Rules
+
+The data-transformation pipeline within the system, and the logic embedded at each stage:
+
+1. **rawDir -> sessionsDir (Parsing and Auto-Segmentation)**
+   - Read the raw Takeout JSON; perform timestamp repair and normalization.
+   - **Session Inference Rule**: Adjacent Turns separated by more than `sessionGapSeconds` (default 1800s) are split into different Sessions.
+   - **Automatic Title Generation**: Take the first 20 characters of the first Turn's prompt in the Session as the default `title`.
+   - Emit structured Session JSON containing the content and a default `visibilityFlag: true`.
+2. **sessionsDir -> turnsMdDir (Cache Pre-Rendering)**
+   - Read Session state and render each Turn independently into a Markdown cache file.
+   - This step ensures that the UI preview and the final export use the same rendering engine.
+3. **turnsMdDir -> topicsDir (Topic Management and Assignment)**
+   - **Topic Management Rules**:
+     - The user multi-selects Sessions in the UI and assigns them to a custom Topic.
+     - **Reordering Flexibility**: Within a Topic, the user can manually adjust the Session order.
+     - **Dissolution and Movement**: Deleting a Topic does not delete the underlying Sessions; it only releases the logical association.
+   - Emit a Topic Definition JSON (Topic Metadata) that establishes the logical mapping over the physical data.
+4. **topicsDir -> exportsDir (Final Physical Merge)**
+   - Pull Markdown cache files in the order specified by the Topic definition and merge them.
+   - Merge only Turns whose `visibilityFlag` is `true`, producing a knowledge document conforming to the template rules.
+
+### 2.4 UI Interaction Rules
+
+- **Visibility Toggle**: Updates `visibilityFlag` in real time and reflects the change in the UI.
+- **Batch Select**: Supports multi-selection of Sessions for Topic categorization.
+- **Organize Action**: A user-initiated export action.
+  - The UI must request confirmation before producing any document.
+  - During execution the UI enters a locked state to prevent data conflicts.
 
 ## 3. Design — "How is the system architected?"
 
 ### 3.1 Core Component Responsibilities
 
-- **Node.js Bridge**: Entry-point management, UI Server provisioning, lifecycle monitoring.  
-- **Python Processing Core**:  
-  - **Parser**: Data parsing.  
-  - **Topic Manager**: Handles read/write of Topic-to-Session associations.  
-  - **Renderer**: Generates the per-Turn MD cache for the UI.  
-  - **Exporter**: Merges the MD cache to produce the final report.  
-- **Local Repository**: `visibility_flag` and state are stored in `warehouse/processed/session_<id>.json`. The per-Turn MD cache under `warehouse/turns_md/` is content-only and does **not** carry visibility — it is the immutable output of the Renderer.
+- **Node.js Bridge**: Entry-point management, UI Server provisioning, IPC with the Python core, and lifecycle monitoring.
+- **Python Processing Core**:
+  - **Parser (`parser.py`)**: Parses raw JSON, repairs timestamps, and runs the Session auto-segmentation logic.
+  - **Topic Manager (`topic_mgr.py`)**: Handles CRUD on Topics and maintains the Session-to-Topic mapping.
+  - **Renderer (`render_md.py`)**: Reads Session JSON and uses the Jinja2 engine to generate the corresponding per-Turn Markdown cache.
+  - **Exporter (`exporter.py`)**: Reads export requests, merges visible MD cache files in Topic / Session order, and produces the final artifact.
 
 ### 3.2 Directory Structure
 
 ```
-ui/                  Node.js frontend code (React/Vue/HTML)
-engine/              Python core logic
-├── parser.py        Parses Takeout data
-├── topic_mgr.py     Manages Topic logic
-├── render_md.py     Generates per-Turn MD cache for the UI
-└── exporter.py      Produces the final merged file
-warehouse/
-├── raw/             Raw JSON (Google Takeout)
-├── processed/       Structured JSON (Session data and visibility flags)
-├── topics/          Topic definition JSON (Session mappings and order)
-└── turns_md/        Per-Turn MD cache produced by the Renderer
-exports/             Final exported Markdown files
+data/
+├── 0-raw/           Raw JSON
+├── 1-sessions/      Structured JSON (Session data and visibilityFlag)
+├── 2-turns_md/      Per-Turn MD cache
+├── 3-topics/        Topic definition JSON
+└── 4-exports/       Final exported Markdown
 ```
 
 ### 3.3 Execution Flow
 
-1. **Startup**: Run `render_md.py` to keep the cache in sync.  
-2. **Pre-rendering**: Verify the sync state between `processed/` and `turns_md/`.  
-3. **UI Loading**: The frontend reads metadata and MD cache content.  
-4. **State Change**: When the user toggles `visibility_flag` or assigns a Topic, the change is written back to JSON immediately.  
-5. **Final Export**: The Exporter reads each Session/Turn's content in order and physically merges them.
+1. **Startup**: System initializes and synchronizes the MD cache state.
+2. **Pre-rendering**: Verify the sync state between `1-sessions/` and `2-turns_md/`.
+3. **UI Loading**: The frontend reads metadata and MD cache content.
+4. **State Change**: The user toggles `visibilityFlag` or assigns Topics.
+5. **Final Export**: The Exporter merges the content and physically writes the output.
 
 ### 3.4 Data Directory Roles
 
 | Directory | Owner | Mutability | Trigger |
 | :---- | :---- | :---- | :---- |
-| `data/raw/` | User input | read-only | initial import |
-| `warehouse/processed/` | Parser / Bridge | mutable state | initial parse + visibility toggles |
-| `warehouse/topics/` | Topic Manager | highly mutable | when the user defines Topics |
-| `warehouse/turns_md/` | Renderer | immutable content | content change or first generation |
+| `data/0-raw/` | User input | read-only | initial import |
+| `data/1-sessions/` | Parser / Bridge | mutable state | initial parse + visibility toggles |
+| `data/3-topics/` | Topic Manager | highly mutable | when the user defines Topics |
+| `data/2-turns_md/` | Renderer | immutable content | content change or first generation |
 
 ## 4. Coding
 
 ### 4.1 Key Development Principles
 
-- **MD as the Display Source of Truth**: The UI must read the generated `.md` files to ensure display matches the export.  
-- **Incremental Update**: `render_md.py` checks file hashes or dates to avoid redundant rendering.  
-- **Lossless Processing**: Data under `data/raw/` must never be modified.
+- **MD as the Display Source of Truth**: The UI must read the generated `.md` files.
+- **Incremental Update**: The rendering engine must check hashes or dates to avoid redundant work.
+- **Lossless Processing**: Raw data under `0-raw/` must never be modified.
 
 ### 4.2 Implementation Tools
 
-- **Node.js**: `child_process.spawn` invokes the Python core.  
-- **Python**: pathlib for paths; jinja2 as the MD rendering engine.
+- **Node.js**: Use `child_process.spawn` to invoke Python.
+- **Python**: Use `pathlib` for cross-platform paths and `jinja2` as the core rendering engine.
 
 ### 4.3 Security and Robustness
 
-- **File Naming**: Use IDs as filenames to avoid special characters.  
-- **Blocking Control**: For large-batch rendering, provide asynchronous feedback or a progress bar.
+- **File Naming**: Use unique IDs as filenames to avoid conflicts caused by special characters.
+- **Blocking Control**: For large-batch processing, provide a progress bar and asynchronous feedback.
 
 ### 4.4 Topic Implementation Details
 
-- **ID Generation**: Recommended pattern `topic_YYYYMMDD_random`.  
-- **Hierarchical Headers**: When exporting a Topic, Session titles should appear as second-level headers (`## Session: [Title]`).
+- **ID Generation**: Recommended pattern `topic_YYYYMMDD_random`.
+- **Hierarchical Headers**: When exporting a Topic, Session titles should automatically demote to a second-level header (`## Session: [Title]`).
