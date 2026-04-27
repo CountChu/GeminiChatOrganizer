@@ -2,27 +2,31 @@ from __future__ import annotations
 
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 TurnKind = Literal["prompted", "created", "gave", "selected", "other"]
 
 
-class Turn(BaseModel):
-    turn_id: str
+class _CamelModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class Turn(_CamelModel):
+    turn_id: str = Field(alias="turnId")
     timestamp: str  # YYYY-MM-DD HH:mm:ss (local)
-    timestamp_utc: str  # original ISO-8601 from Takeout
+    timestamp_utc: str = Field(alias="timestampUtc")  # original ISO-8601 from Takeout
     kind: TurnKind = "prompted"
     prompt: str = ""
     response: str = ""  # raw HTML from Gemini; the Renderer turns this into MD
     attachments: List[str] = Field(default_factory=list)
-    visibility_flag: bool = True
+    visibility_flag: bool = Field(default=True, alias="visibilityFlag")
 
 
-class Session(BaseModel):
-    session_id: str
+class Session(_CamelModel):
+    session_id: str = Field(alias="sessionId")
     title: str
-    start_time: str
-    last_active_time: str
+    start_time: str = Field(alias="beginTime")
+    last_active_time: str = Field(alias="endTime")
     turns: List[Turn]
 
     @property
@@ -30,32 +34,33 @@ class Session(BaseModel):
         return len(self.turns)
 
 
-class Archive(BaseModel):
+class Archive(_CamelModel):
     source: str
     sessions: List[Session]
 
 
-class SessionSummary(BaseModel):
-    session_id: str
+class SessionSummary(_CamelModel):
+    session_id: str = Field(alias="sessionId")
     title: str
-    start_time: str
-    last_active_time: str
-    turn_count: int
-    visible_count: int
-    topic_id: Optional[str] = None
+    start_time: str = Field(alias="beginTime")
+    last_active_time: str = Field(alias="endTime")
+    turn_count: int = Field(alias="turnCount")
+    visible_count: int = Field(alias="visibleCount")
+    topic_id: Optional[str] = Field(default=None, alias="topicId")
 
 
-class Topic(BaseModel):
-    topic_id: str
+class Topic(_CamelModel):
+    topic_id: str = Field(alias="topicId")
     name: str
     description: str = ""
-    session_ids: List[str] = Field(default_factory=list)
+    session_ids: List[str] = Field(default_factory=list, alias="sessionIds")
     tags: List[str] = Field(default_factory=list)
-    created_at: str  # YYYY-MM-DD HH:mm:ss
+    created_at: str = Field(alias="created")  # YYYY-MM-DD HH:mm:ss
+    updated_at: Optional[str] = Field(default=None, alias="updated")
 
 
-class TopicSummary(BaseModel):
-    topic_id: str
+class TopicSummary(_CamelModel):
+    topic_id: str = Field(alias="topicId")
     name: str
-    session_count: int
-    created_at: str
+    session_count: int = Field(alias="sessionCount")
+    created_at: str = Field(alias="created")

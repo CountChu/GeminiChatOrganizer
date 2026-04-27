@@ -12,7 +12,7 @@ const CONFIG_PATH = path.join(REPO_ROOT, "sync_config.yaml");
 function loadFlatYaml(p) {
   const out = {};
   for (const line of fs.readFileSync(p, "utf8").split("\n")) {
-    const m = line.match(/^([a-z_]+):\s*(.*?)\s*$/);
+    const m = line.match(/^([a-zA-Z_]+):\s*"?([^"]*?)"?\s*$/);
     if (!m) continue;
     out[m[1]] = /^-?\d+$/.test(m[2]) ? parseInt(m[2], 10) : m[2];
   }
@@ -20,8 +20,8 @@ function loadFlatYaml(p) {
 }
 
 const syncCfg = loadFlatYaml(CONFIG_PATH);
-const RAW_DIR = path.resolve(REPO_ROOT, syncCfg.raw_dir);
-const TURNS_MD_DIR = path.resolve(REPO_ROOT, syncCfg.turns_md_dir || "warehouse/turns_md");
+const RAW_DIR = path.resolve(REPO_ROOT, syncCfg.rawDir);
+const TURNS_MD_DIR = path.resolve(REPO_ROOT, syncCfg.turnsMdDir || "data/2-turns_md");
 
 console.log("Pre-rendering per-Turn MD cache...");
 const render = spawnSync(PYTHON_PATH, ["-m", "engine.cli", "render", "--config", CONFIG_PATH], {
@@ -55,34 +55,34 @@ function asHandler(fn) {
 }
 
 app.get("/api/sessions", asHandler(async () => bridge.send("list_sessions", {})));
-app.get("/api/sessions/:id", asHandler(async (req) => bridge.send("get_session", { session_id: req.params.id })));
+app.get("/api/sessions/:id", asHandler(async (req) => bridge.send("get_session", { sessionId: req.params.id })));
 app.post("/api/sessions/:id/turns/:tid/visibility", asHandler(async (req) =>
-  bridge.send("toggle_turn", { session_id: req.params.id, turn_id: req.params.tid, visible: !!req.body.visible })
+  bridge.send("toggle_turn", { sessionId: req.params.id, turnId: req.params.tid, visible: !!req.body.visible })
 ));
 
 app.get("/api/topics", asHandler(async () => bridge.send("list_topics", {})));
 app.post("/api/topics", asHandler(async (req) => bridge.send("create_topic", {
   name: req.body?.name || "",
-  session_ids: req.body?.session_ids || [],
+  sessionIds: req.body?.sessionIds || [],
   description: req.body?.description || "",
   tags: req.body?.tags || [],
 })));
-app.get("/api/topics/:id", asHandler(async (req) => bridge.send("get_topic", { topic_id: req.params.id })));
-app.patch("/api/topics/:id", asHandler(async (req) => bridge.send("update_topic", { topic_id: req.params.id, patch: req.body || {} })));
-app.delete("/api/topics/:id", asHandler(async (req) => bridge.send("delete_topic", { topic_id: req.params.id })));
+app.get("/api/topics/:id", asHandler(async (req) => bridge.send("get_topic", { topicId: req.params.id })));
+app.patch("/api/topics/:id", asHandler(async (req) => bridge.send("update_topic", { topicId: req.params.id, patch: req.body || {} })));
+app.delete("/api/topics/:id", asHandler(async (req) => bridge.send("delete_topic", { topicId: req.params.id })));
 app.post("/api/topics/:id/sessions", asHandler(async (req) => bridge.send("add_sessions_to_topic", {
-  topic_id: req.params.id, session_ids: req.body?.session_ids || [],
+  topicId: req.params.id, sessionIds: req.body?.sessionIds || [],
 })));
 app.delete("/api/topics/:id/sessions", asHandler(async (req) => bridge.send("remove_sessions_from_topic", {
-  topic_id: req.params.id, session_ids: req.body?.session_ids || [],
+  topicId: req.params.id, sessionIds: req.body?.sessionIds || [],
 })));
 app.put("/api/topics/:id/order", asHandler(async (req) => bridge.send("reorder_topic_sessions", {
-  topic_id: req.params.id, session_ids: req.body?.session_ids || [],
+  topicId: req.params.id, sessionIds: req.body?.sessionIds || [],
 })));
 
 app.post("/api/export", asHandler(async (req) => bridge.send("export", {
-  session_ids: req.body?.session_ids || null,
-  topic_ids: req.body?.topic_ids || null,
+  sessionIds: req.body?.sessionIds || null,
+  topicIds: req.body?.topicIds || null,
 })));
 app.post("/api/reload", asHandler(async () => bridge.send("reload", {})));
 app.get("/api/lock", (_req, res) => res.json({ locked: bridge.exportInFlight }));

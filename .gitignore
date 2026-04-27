@@ -2,9 +2,9 @@
 __pycache__/
 *.pyc
 node_modules/
-warehouse/processed/
-warehouse/turns_md/
-warehouse/topics/
-exports/
+data/1-sessions/
+data/2-turns_md/
+data/3-topics/
+data/4-exports/
 .DS_Store
 data

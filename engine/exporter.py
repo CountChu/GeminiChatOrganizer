@@ -167,16 +167,16 @@ def export_archive(
     return written
 
 
-def load_session(processed_dir: Path, session_id: str) -> Session:
-    path = processed_dir / f"session_{session_id}.json"
+def load_session(sessions_dir: Path, session_id: str) -> Session:
+    path = sessions_dir / f"session_{session_id}.json"
     return Session.model_validate_json(path.read_text(encoding="utf-8"))
 
 
-def load_all_sessions(processed_dir: Path) -> List[Session]:
-    if not processed_dir.exists():
+def load_all_sessions(sessions_dir: Path) -> List[Session]:
+    if not sessions_dir.exists():
         return []
     sessions: List[Session] = []
-    for p in sorted(processed_dir.glob("session_*.json")):
+    for p in sorted(sessions_dir.glob("session_*.json")):
         sessions.append(Session.model_validate_json(p.read_text(encoding="utf-8")))
     sessions.sort(key=lambda s: s.start_time)
     return sessions

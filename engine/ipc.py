@@ -9,7 +9,7 @@ from typing import Callable, Dict, List, Optional
 from . import topic_mgr
 from .exporter import export_archive, load_session, load_template_config
 from .models import Session, SessionSummary, Topic, TopicSummary
-from .parser import merge_visibility, parse_archive, write_processed
+from .parser import merge_visibility, parse_archive, write_sessions
 from .render_md import render_all
 
 
@@ -17,7 +17,7 @@ class State:
     def __init__(
         self,
         raw_dir: Path,
-        processed_dir: Path,
+        sessions_dir: Path,
         turns_md_dir: Path,
         topics_dir: Path,
         exports_dir: Path,
@@ -25,7 +25,7 @@ class State:
         template_path: Path,
     ) -> None:
         self.raw_dir = raw_dir
-        self.processed_dir = processed_dir
+        self.sessions_dir = sessions_dir
         self.turns_md_dir = turns_md_dir
         self.topics_dir = topics_dir
         self.exports_dir = exports_dir
@@ -37,9 +37,9 @@ class State:
         if self._sessions_cache is not None:
             return self._sessions_cache
         archive = parse_archive(self.raw_dir, self.gap_seconds)
-        merge_visibility(archive, self.processed_dir)
-        write_processed(archive, self.processed_dir)
-        render_all(self.processed_dir, self.turns_md_dir, self.template_path)
+        merge_visibility(archive, self.sessions_dir)
+        write_sessions(archive, self.sessions_dir)
+        render_all(self.sessions_dir, self.turns_md_dir, self.template_path)
         self._sessions_cache = archive.sessions
         return archive.sessions
 
@@ -51,12 +51,12 @@ class State:
         for s in self.ensure_loaded():
             if s.session_id == sid:
                 return s
-        return load_session(self.processed_dir, sid)
+        return load_session(self.sessions_dir, sid)
 
     def write_session(self, session: Session) -> None:
-        self.processed_dir.mkdir(parents=True, exist_ok=True)
-        path = self.processed_dir / f"session_{session.session_id}.json"
-        path.write_text(session.model_dump_json(indent=2), encoding="utf-8")
+        self.sessions_dir.mkdir(parents=True, exist_ok=True)
+        path = self.sessions_dir / f"session_{session.session_id}.json"
+        path.write_text(session.model_dump_json(indent=2, by_alias=True), encoding="utf-8")
         if self._sessions_cache is not None:
             for i, s in enumerate(self._sessions_cache):
                 if s.session_id == session.session_id:
@@ -86,17 +86,17 @@ def _topic_summary(t: Topic) -> TopicSummary:
 def cmd_list_sessions(state: State, _args: dict) -> dict:
     sessions = state.ensure_loaded()
     membership = topic_mgr.session_to_topic_map(topic_mgr.load_topics(state.topics_dir))
-    return {"sessions": [_summary(s, membership.get(s.session_id)).model_dump() for s in sessions]}
+    return {"sessions": [_summary(s, membership.get(s.session_id)).model_dump(by_alias=True) for s in sessions]}
 
 
 def cmd_get_session(state: State, args: dict) -> dict:
-    sid = args["session_id"]
-    return {"session": state.get_session(sid).model_dump()}
+    sid = args["sessionId"]
+    return {"session": state.get_session(sid).model_dump(by_alias=True)}
 
 
 def cmd_toggle_turn(state: State, args: dict) -> dict:
-    sid = args["session_id"]
-    tid = args["turn_id"]
+    sid = args["sessionId"]
+    tid = args["turnId"]
     visible = bool(args["visible"])
     session = state.get_session(sid)
     found = False
@@ -108,18 +108,18 @@ def cmd_toggle_turn(state: State, args: dict) -> dict:
     if not found:
         raise KeyError(f"turn {tid} not found in session {sid}")
     state.write_session(session)
-    return {"session_id": sid, "turn_id": tid, "visible": visible}
+    return {"sessionId": sid, "turnId": tid, "visible": visible}
 
 
 # ---------- topic commands ----------
 
 def cmd_list_topics(state: State, _args: dict) -> dict:
     topics = topic_mgr.load_topics(state.topics_dir)
-    return {"topics": [_topic_summary(t).model_dump() for t in topics]}
+    return {"topics": [_topic_summary(t).model_dump(by_alias=True) for t in topics]}
 
 
 def cmd_get_topic(state: State, args: dict) -> dict:
-    tid = args["topic_id"]
+    tid = args["topicId"]
     topic = topic_mgr.load_topic(state.topics_dir, tid)
     sessions = {s.session_id: s for s in state.ensure_loaded()}
     membership = topic_mgr.session_to_topic_map(topic_mgr.load_topics(state.topics_dir))
@@ -128,21 +128,21 @@ def cmd_get_topic(state: State, args: dict) -> dict:
         s = sessions.get(sid)
         if s is None:
             continue
-        members.append(_summary(s, membership.get(sid)).model_dump())
-    return {"topic": topic.model_dump(), "sessions": members}
+        members.append(_summary(s, membership.get(sid)).model_dump(by_alias=True))
+    return {"topic": topic.model_dump(by_alias=True), "sessions": members}
 
 
 def cmd_create_topic(state: State, args: dict) -> dict:
     name = args.get("name", "")
-    sids = list(args.get("session_ids") or [])
+    sids = list(args.get("sessionIds") or [])
     description = args.get("description", "") or ""
     tags = list(args.get("tags") or [])
     topic = topic_mgr.create_topic(state.topics_dir, name=name, session_ids=sids, description=description, tags=tags)
-    return {"topic": topic.model_dump()}
+    return {"topic": topic.model_dump(by_alias=True)}
 
 
 def cmd_update_topic(state: State, args: dict) -> dict:
-    tid = args["topic_id"]
+    tid = args["topicId"]
     patch = args.get("patch") or {}
     topic = topic_mgr.update_topic(
         state.topics_dir,
@@ -151,41 +151,41 @@ def cmd_update_topic(state: State, args: dict) -> dict:
         description=patch.get("description"),
         tags=patch.get("tags"),
     )
-    return {"topic": topic.model_dump()}
+    return {"topic": topic.model_dump(by_alias=True)}
 
 
 def cmd_delete_topic(state: State, args: dict) -> dict:
-    tid = args["topic_id"]
+    tid = args["topicId"]
     topic_mgr.delete_topic(tid, state.topics_dir)
-    return {"topic_id": tid, "deleted": True}
+    return {"topicId": tid, "deleted": True}
 
 
 def cmd_add_sessions_to_topic(state: State, args: dict) -> dict:
-    tid = args["topic_id"]
-    sids = list(args.get("session_ids") or [])
+    tid = args["topicId"]
+    sids = list(args.get("sessionIds") or [])
     topic = topic_mgr.add_sessions(state.topics_dir, tid, sids)
-    return {"topic": topic.model_dump()}
+    return {"topic": topic.model_dump(by_alias=True)}
 
 
 def cmd_remove_sessions_from_topic(state: State, args: dict) -> dict:
-    tid = args["topic_id"]
-    sids = list(args.get("session_ids") or [])
+    tid = args["topicId"]
+    sids = list(args.get("sessionIds") or [])
     topic = topic_mgr.remove_sessions(state.topics_dir, tid, sids)
-    return {"topic": topic.model_dump()}
+    return {"topic": topic.model_dump(by_alias=True)}
 
 
 def cmd_reorder_topic_sessions(state: State, args: dict) -> dict:
-    tid = args["topic_id"]
-    sids = list(args.get("session_ids") or [])
+    tid = args["topicId"]
+    sids = list(args.get("sessionIds") or [])
     topic = topic_mgr.reorder_sessions(state.topics_dir, tid, sids)
-    return {"topic": topic.model_dump()}
+    return {"topic": topic.model_dump(by_alias=True)}
 
 
 # ---------- export ----------
 
 def cmd_export(state: State, args: dict) -> dict:
-    only_session_ids = args.get("session_ids")
-    only_topic_ids = args.get("topic_ids")
+    only_session_ids = args.get("sessionIds")
+    only_topic_ids = args.get("topicIds")
     template_cfg = load_template_config(state.template_path)
     sessions = state.ensure_loaded()
     topics = topic_mgr.load_topics(state.topics_dir)

@@ -58,8 +58,8 @@ function show(view) {
   elTopicContent.hidden = view !== "topic";
 }
 
-function topicById(id) { return state.topics.find((t) => t.topic_id === id); }
-function sessionSummary(id) { return state.sessions.find((s) => s.session_id === id); }
+function topicById(id) { return state.topics.find((t) => t.topicId === id); }
+function sessionSummary(id) { return state.sessions.find((s) => s.sessionId === id); }
 
 // ---------- data loading ----------
 
@@ -86,30 +86,30 @@ function renderSidebar() {
   const q = elSearch.value.trim().toLowerCase();
   const matchesQ = (s) => !q || s.title.toLowerCase().includes(q);
   const ord = state.sortDir === "desc"
-    ? (a, b) => b.start_time.localeCompare(a.start_time)
-    : (a, b) => a.start_time.localeCompare(b.start_time);
+    ? (a, b) => b.beginTime.localeCompare(a.beginTime)
+    : (a, b) => a.beginTime.localeCompare(b.beginTime);
 
   // Topics group
   elTopicsBody.innerHTML = "";
-  for (const tp of [...state.topics].sort((a, b) => a.created_at.localeCompare(b.created_at))) {
+  for (const tp of [...state.topics].sort((a, b) => a.created.localeCompare(b.created))) {
     const tDiv = document.createElement("div");
     tDiv.className = "topic-row";
-    tDiv.dataset.id = tp.topic_id;
-    if (state.currentTopic && state.currentTopic.topic_id === tp.topic_id) tDiv.classList.add("active");
+    tDiv.dataset.id = tp.topicId;
+    if (state.currentTopic && state.currentTopic.topicId === tp.topicId) tDiv.classList.add("active");
     const head = document.createElement("div");
     head.className = "topic-head-row";
     head.innerHTML = `<span class="topic-name"></span><span class="topic-count"></span>`;
     head.querySelector(".topic-name").textContent = tp.name;
-    head.querySelector(".topic-count").textContent = tp.session_count;
-    head.addEventListener("click", () => loadTopic(tp.topic_id));
+    head.querySelector(".topic-count").textContent = tp.sessionCount;
+    head.addEventListener("click", () => loadTopic(tp.topicId));
     tDiv.appendChild(head);
 
     const ul = document.createElement("ul");
     ul.className = "group-list nested";
     const memberSummaries = state.sessions
-      .filter((s) => s.topic_id === tp.topic_id && matchesQ(s) && !(state.hideHidden && s.visible_count === 0))
+      .filter((s) => s.topicId === tp.topicId && matchesQ(s) && !(state.hideHidden && s.visibleCount === 0))
       .sort(ord);
-    for (const s of memberSummaries) ul.appendChild(sessionRow(s, tp.topic_id));
+    for (const s of memberSummaries) ul.appendChild(sessionRow(s, tp.topicId));
     tDiv.appendChild(ul);
     elTopicsBody.appendChild(tDiv);
   }
@@ -118,7 +118,7 @@ function renderSidebar() {
   // Uncategorized group
   elUncatList.innerHTML = "";
   const uncat = state.sessions
-    .filter((s) => !s.topic_id && matchesQ(s) && !(state.hideHidden && s.visible_count === 0))
+    .filter((s) => !s.topicId && matchesQ(s) && !(state.hideHidden && s.visibleCount === 0))
     .sort(ord);
   for (const s of uncat) elUncatList.appendChild(sessionRow(s, null));
   elUncatCount.textContent = uncat.length;
@@ -131,8 +131,8 @@ function renderSidebar() {
 function sessionRow(s, parentTopicId) {
   const li = document.createElement("li");
   li.className = "session-row";
-  li.dataset.id = s.session_id;
-  if (state.current && state.current.session_id === s.session_id) li.classList.add("active");
+  li.dataset.id = s.sessionId;
+  if (state.current && state.current.sessionId === s.sessionId) li.classList.add("active");
   li.innerHTML = `
     <input type="checkbox" class="session-check" />
     <div class="session-text">
@@ -141,17 +141,17 @@ function sessionRow(s, parentTopicId) {
     </div>
   `;
   const cb = li.querySelector(".session-check");
-  cb.checked = state.selected.has(s.session_id);
+  cb.checked = state.selected.has(s.sessionId);
   cb.addEventListener("click", (e) => e.stopPropagation());
   cb.addEventListener("change", () => {
-    if (cb.checked) state.selected.add(s.session_id);
-    else state.selected.delete(s.session_id);
+    if (cb.checked) state.selected.add(s.sessionId);
+    else state.selected.delete(s.sessionId);
     refreshMultiSelectBar();
   });
   li.querySelector(".session-title").textContent = s.title || "(untitled)";
   li.querySelector(".session-meta").textContent =
-    `${s.start_time.split(" ")[0]} · ${s.visible_count}/${s.turn_count} visible`;
-  li.addEventListener("click", () => loadSession(s.session_id));
+    `${s.beginTime.split(" ")[0]} · ${s.visibleCount}/${s.turnCount} visible`;
+  li.addEventListener("click", () => loadSession(s.sessionId));
   return li;
 }
 
@@ -161,7 +161,7 @@ function refreshMultiSelectBar() {
   elMSCount.textContent = `${n} selected`;
   // Show "− Topic" only when ALL selected belong to the SAME topic
   const ids = [...state.selected];
-  const topicIds = new Set(ids.map((sid) => sessionSummary(sid)?.topic_id || null));
+  const topicIds = new Set(ids.map((sid) => sessionSummary(sid)?.topicId || null));
   const allInSame = ids.length > 0 && topicIds.size === 1 && !topicIds.has(null);
   elMSRemove.hidden = !allInSame;
 }
@@ -170,8 +170,8 @@ function refreshAddToDropdown() {
   elMSAdd.innerHTML = '<option value="">Add to…</option>';
   for (const t of state.topics) {
     const opt = document.createElement("option");
-    opt.value = t.topic_id;
-    opt.textContent = `${t.name} (${t.session_count})`;
+    opt.value = t.topicId;
+    opt.textContent = `${t.name} (${t.sessionCount})`;
     elMSAdd.appendChild(opt);
   }
 }
@@ -190,20 +190,20 @@ async function loadSession(id) {
 async function renderSessionView() {
   if (!state.current) return;
   elSessionTitle.textContent = state.current.title || "(untitled)";
-  const range = state.current.start_time === state.current.last_active_time
-    ? state.current.start_time
-    : `${state.current.start_time} → ${state.current.last_active_time}`;
+  const range = state.current.beginTime === state.current.endTime
+    ? state.current.beginTime
+    : `${state.current.beginTime} → ${state.current.endTime}`;
   elSessionMeta.textContent =
-    `${state.current.session_id} · ${range} · ${state.current.turns.length} turns`;
+    `${state.current.sessionId} · ${range} · ${state.current.turns.length} turns`;
   elTurnsList.innerHTML = "";
-  const visibleTurns = state.current.turns.filter((t) => !(state.hideHidden && !t.visibility_flag));
-  const mdTexts = await Promise.all(visibleTurns.map((t) => fetchTurnMd(t.turn_id)));
+  const visibleTurns = state.current.turns.filter((t) => !(state.hideHidden && !t.visibilityFlag));
+  const mdTexts = await Promise.all(visibleTurns.map((t) => fetchTurnMd(t.turnId)));
   visibleTurns.forEach((t, i) => elTurnsList.appendChild(renderTurn(t, mdTexts[i])));
 }
 
 function renderTurn(turn, turnMdText) {
   const div = document.createElement("div");
-  div.className = "turn" + (turn.visibility_flag ? "" : " hidden");
+  div.className = "turn" + (turn.visibilityFlag ? "" : " hidden");
   const promptText = turn.prompt || "(no prompt — " + turn.kind + ")";
   div.innerHTML = `
     <div class="turn-head">
@@ -220,9 +220,9 @@ function renderTurn(turn, turnMdText) {
   kindEl.textContent = turn.kind;
   kindEl.classList.add(turn.kind);
   const btn = div.querySelector(".toggle-btn");
-  btn.dataset.visible = String(turn.visibility_flag);
-  btn.textContent = turn.visibility_flag ? "Visible" : "Hidden";
-  btn.addEventListener("click", () => toggleTurn(turn.turn_id, !turn.visibility_flag));
+  btn.dataset.visible = String(turn.visibilityFlag);
+  btn.textContent = turn.visibilityFlag ? "Visible" : "Hidden";
+  btn.addEventListener("click", () => toggleTurn(turn.turnId, !turn.visibilityFlag));
   div.querySelector(".turn-prompt").textContent = promptText;
   const respEl = div.querySelector(".turn-response");
   if (state.mdPreview && turnMdText && typeof marked !== "undefined") {
@@ -270,16 +270,16 @@ function renderTurn(turn, turnMdText) {
 
 async function toggleTurn(turnId, visible) {
   if (!state.current) return;
-  const sid = state.current.session_id;
+  const sid = state.current.sessionId;
   try {
     setStatus("toggling…");
     await api(`/api/sessions/${sid}/turns/${turnId}/visibility`, {
       method: "POST", body: JSON.stringify({ visible }),
     });
-    const t = state.current.turns.find((tt) => tt.turn_id === turnId);
-    if (t) t.visibility_flag = visible;
+    const t = state.current.turns.find((tt) => tt.turnId === turnId);
+    if (t) t.visibilityFlag = visible;
     const summary = sessionSummary(sid);
-    if (summary) summary.visible_count = state.current.turns.filter((tt) => tt.visibility_flag).length;
+    if (summary) summary.visibleCount = state.current.turns.filter((tt) => tt.visibilityFlag).length;
     await renderSessionView();
     renderSidebar();
     setStatus("saved");
@@ -302,7 +302,7 @@ function renderTopicView() {
   const t = state.currentTopic;
   if (!t) return;
   $("#topic-title").textContent = t.name;
-  $("#topic-meta").textContent = `${t.topic_id} · created ${t.created_at} · ${t.session_ids.length} sessions`;
+  $("#topic-meta").textContent = `${t.topicId} · created ${t.created} · ${t.sessionIds.length} sessions`;
   $("#topic-description").value = t.description || "";
 
   const ol = $("#topic-sessions");
@@ -323,29 +323,29 @@ function renderTopicView() {
       <button class="ts-remove" title="Remove from this Topic">×</button>
     `;
     li.querySelector(".ts-title").textContent = s.title || "(untitled)";
-    li.querySelector(".ts-meta").textContent = `${s.session_id} · ${s.visible_count}/${s.turn_count} visible`;
+    li.querySelector(".ts-meta").textContent = `${s.sessionId} · ${s.visibleCount}/${s.turnCount} visible`;
     li.querySelector(".up").addEventListener("click", () => reorder(idx, idx - 1));
     li.querySelector(".down").addEventListener("click", () => reorder(idx, idx + 1));
-    li.querySelector(".ts-open").addEventListener("click", () => loadSession(s.session_id));
-    li.querySelector(".ts-remove").addEventListener("click", () => removeOneFromTopic(s.session_id));
+    li.querySelector(".ts-open").addEventListener("click", () => loadSession(s.sessionId));
+    li.querySelector(".ts-remove").addEventListener("click", () => removeOneFromTopic(s.sessionId));
     ol.appendChild(li);
   });
 }
 
 async function reorder(fromIdx, toIdx) {
   if (toIdx < 0 || toIdx >= state.currentTopicMembers.length) return;
-  const ids = state.currentTopic.session_ids.slice();
+  const ids = state.currentTopic.sessionIds.slice();
   const [moved] = ids.splice(fromIdx, 1);
   ids.splice(toIdx, 0, moved);
   try {
     setStatus("reordering…");
-    const data = await api(`/api/topics/${state.currentTopic.topic_id}/order`, {
-      method: "PUT", body: JSON.stringify({ session_ids: ids }),
+    const data = await api(`/api/topics/${state.currentTopic.topicId}/order`, {
+      method: "PUT", body: JSON.stringify({ sessionIds: ids }),
     });
     state.currentTopic = data.topic;
     // Reorder local member array to match
     const order = new Map(ids.map((sid, i) => [sid, i]));
-    state.currentTopicMembers.sort((a, b) => order.get(a.session_id) - order.get(b.session_id));
+    state.currentTopicMembers.sort((a, b) => order.get(a.sessionId) - order.get(b.sessionId));
     renderTopicView();
     setStatus("saved");
   } catch (e) { setStatus(e.message, true); }
@@ -354,12 +354,12 @@ async function reorder(fromIdx, toIdx) {
 async function removeOneFromTopic(sessionId) {
   try {
     setStatus("removing from topic…");
-    const data = await api(`/api/topics/${state.currentTopic.topic_id}/sessions`, {
-      method: "DELETE", body: JSON.stringify({ session_ids: [sessionId] }),
+    const data = await api(`/api/topics/${state.currentTopic.topicId}/sessions`, {
+      method: "DELETE", body: JSON.stringify({ sessionIds: [sessionId] }),
     });
     state.currentTopic = data.topic;
     await loadAll();
-    state.currentTopicMembers = state.currentTopicMembers.filter((s) => s.session_id !== sessionId);
+    state.currentTopicMembers = state.currentTopicMembers.filter((s) => s.sessionId !== sessionId);
     renderTopicView();
     setStatus("removed");
   } catch (e) { setStatus(e.message, true); }
@@ -371,7 +371,7 @@ async function deleteCurrentTopic() {
   if (!confirm(`Delete topic "${t.name}"? Sessions return to Uncategorized; nothing else is deleted.`)) return;
   try {
     setStatus("deleting topic…");
-    await api(`/api/topics/${t.topic_id}`, { method: "DELETE" });
+    await api(`/api/topics/${t.topicId}`, { method: "DELETE" });
     state.currentTopic = null;
     state.currentTopicMembers = [];
     show("empty");
@@ -383,10 +383,10 @@ async function deleteCurrentTopic() {
 async function organizeCurrentTopic() {
   const t = state.currentTopic;
   if (!t) return;
-  if (!confirm(`Export topic "${t.name}" to exports/?`)) return;
+  if (!confirm(`Export topic "${t.name}" to data/4-exports/?`)) return;
   elLockOverlay.hidden = false;
   try {
-    const data = await api("/api/export", { method: "POST", body: JSON.stringify({ topic_ids: [t.topic_id] }) });
+    const data = await api("/api/export", { method: "POST", body: JSON.stringify({ topicIds: [t.topicId] }) });
     setStatus(`exported ${data.files.length} file(s)`);
   } catch (e) { setStatus(e.message, true); }
   finally { elLockOverlay.hidden = true; }
@@ -398,7 +398,7 @@ async function saveTopicDescription() {
   const desc = $("#topic-description").value;
   if (desc === (t.description || "")) return;
   try {
-    const data = await api(`/api/topics/${t.topic_id}`, {
+    const data = await api(`/api/topics/${t.topicId}`, {
       method: "PATCH", body: JSON.stringify({ description: desc }),
     });
     state.currentTopic = data.topic;
@@ -412,7 +412,7 @@ async function renameCurrentTopic() {
   const name = prompt("Rename topic:", t.name);
   if (!name || !name.trim() || name === t.name) return;
   try {
-    const data = await api(`/api/topics/${t.topic_id}`, {
+    const data = await api(`/api/topics/${t.topicId}`, {
       method: "PATCH", body: JSON.stringify({ name: name.trim() }),
     });
     state.currentTopic = data.topic;
@@ -436,11 +436,11 @@ async function createTopicFromSelection() {
   if (!name || !name.trim()) return;
   try {
     const data = await api("/api/topics", {
-      method: "POST", body: JSON.stringify({ name: name.trim(), session_ids: sids }),
+      method: "POST", body: JSON.stringify({ name: name.trim(), sessionIds: sids }),
     });
     state.selected.clear();
     await loadAll();
-    await loadTopic(data.topic.topic_id);
+    await loadTopic(data.topic.topicId);
     setStatus(`created topic "${data.topic.name}"`);
   } catch (e) { setStatus(e.message, true); }
 }
@@ -451,7 +451,7 @@ async function addSelectionToTopic(topicId) {
   if (sids.length === 0) return;
   try {
     await api(`/api/topics/${topicId}/sessions`, {
-      method: "POST", body: JSON.stringify({ session_ids: sids }),
+      method: "POST", body: JSON.stringify({ sessionIds: sids }),
     });
     state.selected.clear();
     await loadAll();
@@ -463,11 +463,11 @@ async function addSelectionToTopic(topicId) {
 async function removeSelectionFromTopic() {
   const sids = [...state.selected];
   if (sids.length === 0) return;
-  const topicId = sessionSummary(sids[0])?.topic_id;
+  const topicId = sessionSummary(sids[0])?.topicId;
   if (!topicId) return;
   try {
     await api(`/api/topics/${topicId}/sessions`, {
-      method: "DELETE", body: JSON.stringify({ session_ids: sids }),
+      method: "DELETE", body: JSON.stringify({ sessionIds: sids }),
     });
     state.selected.clear();
     await loadAll();
@@ -478,7 +478,7 @@ async function removeSelectionFromTopic() {
 // ---------- top-bar actions ----------
 
 async function organizeAll() {
-  if (!confirm("Export all sessions to exports/?")) return;
+  if (!confirm("Export all sessions to data/4-exports/?")) return;
   elLockOverlay.hidden = false;
   try {
     const data = await api("/api/export", { method: "POST", body: JSON.stringify({}) });

@@ -1,6 +1,6 @@
-raw_dir: data/0-raw/Gemini Apps 260424
-processed_dir: warehouse/processed
-turns_md_dir: warehouse/turns_md
-topics_dir: warehouse/topics
-exports_dir: exports
-session_gap_seconds: 1800
+rawDir: "data/0-raw/Gemini Apps 260424"
+sessionsDir: "data/1-sessions"
+turnsMdDir: "data/2-turns_md"
+topicsDir: "data/3-topics"
+exportsDir: "data/4-exports"
+sessionGapSeconds: 1800

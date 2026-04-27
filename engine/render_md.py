@@ -37,7 +37,7 @@ def render_turn(turn: Turn, template_cfg: dict, env: Environment) -> str:
         "prompt": turn.prompt,
         "prompt_preview": _prompt_preview(turn.prompt),
         "response_md": response_md,
-        "turn_id": turn.turn_id,
+        "turnId": turn.turn_id,
     }
     parts: List[str] = [turn_header_tpl.render(**ctx)]
     if turn.prompt:
@@ -57,21 +57,21 @@ def _load_template(template_path: Path) -> dict:
     return yaml.safe_load(template_path.read_text(encoding="utf-8")) or {}
 
 
-def render_all(processed_dir: Path, turns_md_dir: Path, template_path: Path) -> dict:
+def render_all(sessions_dir: Path, turns_md_dir: Path, template_path: Path) -> dict:
     """Render any per-Turn MD files that don't already exist on disk.
 
     Idempotent and incremental: turn_id + content are immutable per parse, so
     presence of `<turns_md_dir>/<turn_id>.md` is sufficient to skip.
     """
     turns_md_dir.mkdir(parents=True, exist_ok=True)
-    if not processed_dir.exists():
+    if not sessions_dir.exists():
         return {"rendered": 0, "skipped": 0, "sessions": 0}
     template_cfg = _load_template(template_path)
     env = Environment(undefined=StrictUndefined, autoescape=False)
     rendered = 0
     skipped = 0
     sessions = 0
-    for session_path in sorted(processed_dir.glob("session_*.json")):
+    for session_path in sorted(sessions_dir.glob("session_*.json")):
         session = _load_session(session_path)
         sessions += 1
         for turn in session.turns:

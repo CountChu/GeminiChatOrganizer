@@ -136,11 +136,11 @@ def parse_archive(raw_dir: Path, session_gap_seconds: int) -> Archive:
     return Archive(source=str(raw_dir), sessions=sessions)
 
 
-def merge_visibility(archive: Archive, processed_dir: Path) -> Archive:
-    if not processed_dir.exists():
+def merge_visibility(archive: Archive, sessions_dir: Path) -> Archive:
+    if not sessions_dir.exists():
         return archive
     for session in archive.sessions:
-        path = processed_dir / f"session_{session.session_id}.json"
+        path = sessions_dir / f"session_{session.session_id}.json"
         if not path.exists():
             continue
         try:
@@ -149,20 +149,20 @@ def merge_visibility(archive: Archive, processed_dir: Path) -> Archive:
             continue
         flags: Dict[str, bool] = {}
         for t in existing.get("turns", []):
-            tid = t.get("turn_id")
+            tid = t.get("turnId", t.get("turn_id"))
             if tid is not None:
-                flags[tid] = bool(t.get("visibility_flag", True))
+                flags[tid] = bool(t.get("visibilityFlag", t.get("visibility_flag", True)))
         for turn in session.turns:
             if turn.turn_id in flags:
                 turn.visibility_flag = flags[turn.turn_id]
     return archive
 
 
-def write_processed(archive: Archive, processed_dir: Path) -> List[Path]:
-    processed_dir.mkdir(parents=True, exist_ok=True)
+def write_sessions(archive: Archive, sessions_dir: Path) -> List[Path]:
+    sessions_dir.mkdir(parents=True, exist_ok=True)
     written: List[Path] = []
     for session in archive.sessions:
-        path = processed_dir / f"session_{session.session_id}.json"
-        path.write_text(session.model_dump_json(indent=2), encoding="utf-8")
+        path = sessions_dir / f"session_{session.session_id}.json"
+        path.write_text(session.model_dump_json(indent=2, by_alias=True), encoding="utf-8")
         written.append(path)
     return written
