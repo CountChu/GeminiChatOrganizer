@@ -19,6 +19,26 @@ const turnMdUrl = (id) => "/turns_md/" + encodeURIComponent(id) + ".md";
 const displayTitle = (s) => (s.title || "(untitled)");
 const displayPrompt = (t) => (t.prompt2 || t.prompt || "");
 
+const ABS_URL_RE = /^(https?:|\/|#|mailto:|tel:|data:)/i;
+function rewriteAttachmentUrls(root) {
+  // Marked renders attachment-list links from per-turn MD as relative hrefs
+  // like `image-...png`. Rewrite them to `/raw/<name>` so they hit the static
+  // mount; do the same for any inline relative <img src>. Cached MD stays
+  // portable (no /raw/ prefix on disk) so exports remain self-contained.
+  root.querySelectorAll("a[href]").forEach((a) => {
+    const h = a.getAttribute("href");
+    if (h && !ABS_URL_RE.test(h)) {
+      a.href = "/raw/" + encodeURIComponent(h);
+      a.target = "_blank";
+      a.rel = "noopener";
+    }
+  });
+  root.querySelectorAll("img[src]").forEach((img) => {
+    const s = img.getAttribute("src");
+    if (s && !ABS_URL_RE.test(s)) img.src = "/raw/" + encodeURIComponent(s);
+  });
+}
+
 const $ = (sel) => document.querySelector(sel);
 const elTopicsBody = $("#topics-body");
 const elTopicsCount = $("#topics-count");
@@ -239,6 +259,7 @@ function renderTurn(turn, turnMdText) {
   if (state.mdPreview && turnMdText && typeof marked !== "undefined") {
     respEl.classList.add("preview");
     respEl.innerHTML = marked.parse(turnMdText);
+    rewriteAttachmentUrls(respEl);
     if (typeof renderMathInElement === "function") {
       renderMathInElement(respEl, {
         delimiters: [
