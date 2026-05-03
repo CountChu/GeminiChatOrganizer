@@ -38,6 +38,12 @@ class Session(_CamelModel):
     def turn_count(self) -> int:
         return len(self.turns)
 
+    @property
+    def display_title(self) -> str:
+        if self.turns and self.turns[0].prompt2:
+            return self.turns[0].prompt2
+        return self.title
+
 
 class Archive(_CamelModel):
     source: str
@@ -47,6 +53,7 @@ class Archive(_CamelModel):
 class SessionSummary(_CamelModel):
     session_id: str = Field(alias="sessionId")
     title: str
+    display_title: str = Field(default="", alias="displayTitle")
     start_time: str = Field(alias="beginTime")
     last_active_time: str = Field(alias="endTime")
     turn_count: int = Field(alias="turnCount")

@@ -71,6 +71,7 @@ def _summary(s: Session, topic_id: Optional[str]) -> SessionSummary:
     return SessionSummary(
         session_id=s.session_id,
         title=s.title,
+        display_title=s.display_title,
         start_time=s.start_time,
         last_active_time=s.last_active_time,
         turn_count=s.turn_count,
@@ -110,7 +111,13 @@ def cmd_update_turn_prompt(state: State, args: dict) -> dict:
     env = Environment(undefined=StrictUndefined, autoescape=False)
     md_path = state.turns_md_dir / f"{tid}.md"
     md_path.write_text(render_turn(target, template_cfg, env), encoding="utf-8")
-    return {"sessionId": sid, "turnId": tid, "prompt2": prompt2}
+    membership = topic_mgr.session_to_topic_map(topic_mgr.load_topics(state.topics_dir))
+    return {
+        "sessionId": sid,
+        "turnId": tid,
+        "prompt2": prompt2,
+        "summary": _summary(session, membership.get(session.session_id)).model_dump(by_alias=True),
+    }
 
 
 def cmd_toggle_turn(state: State, args: dict) -> dict:

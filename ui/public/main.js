@@ -16,7 +16,8 @@ const isImage = (n) => { const i = n.lastIndexOf("."); return i >= 0 && IMG_EXTS
 const rawUrl = (n) => "/raw/" + encodeURIComponent(n);
 const turnMdUrl = (id) => "/turns_md/" + encodeURIComponent(id) + ".md";
 
-const displayTitle = (s) => (s.title || "(untitled)");
+const displayTitle = (s) =>
+  s.displayTitle || (s.turns && s.turns[0] && s.turns[0].prompt2) || s.title || "(untitled)";
 const displayPrompt = (t) => (t.prompt2 || t.prompt || "");
 
 const ABS_URL_RE = /^(https?:|\/|#|mailto:|tel:|data:)/i;
@@ -311,12 +312,17 @@ async function editTurnPrompt(turnId) {
   if (prompt2 === current) return;
   try {
     setStatus("saving…");
-    await api(`/api/sessions/${state.current.sessionId}/turns/${turnId}/prompt2`, {
+    const data = await api(`/api/sessions/${state.current.sessionId}/turns/${turnId}/prompt2`, {
       method: "PATCH", body: JSON.stringify({ prompt2 }),
     });
     turn.prompt2 = prompt2;
     turnMdCache.delete(turnId);
+    if (data.summary) {
+      const i = state.sessions.findIndex((x) => x.sessionId === data.summary.sessionId);
+      if (i >= 0) state.sessions[i] = data.summary;
+    }
     await renderSessionView();
+    renderSidebar();
     setStatus("saved");
   } catch (e) { setStatus(e.message, true); }
 }

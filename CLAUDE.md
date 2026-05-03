@@ -48,4 +48,4 @@ These are the constraints most likely to be violated by default implementations 
 
 ## Markdown style
 
-When creating or editing Markdown files in this repo, follow the rules in [.claude/skills/sync-rsdc/references/MD-style.md](.claude/skills/sync-rsdc/references/MD-style.md).
+When creating or editing Markdown files in this repo, follow the rules in [.github/skills/reformat-rsdc/references/MD-style.md](.github/skills/reformat-rsdc/references/MD-style.md).
