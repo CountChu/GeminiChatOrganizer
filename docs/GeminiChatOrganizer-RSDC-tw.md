@@ -62,14 +62,15 @@ sessionIds = [sessionId]
 **Syntax**
 
 ```
-session = {sessionId, title, beginTime, endTime, turns}
+session = {sessionId, title, title2, beginTime, endTime, turns}
 turns = [turn]
 ```
 
 **Fields**
 
 - `sessionId`: 唯一識別碼。
-- title: Session 標題，預設由首句擷取生成。
+- `title`: Session 標題，預設由首句擷取生成。
+- `title2`: 使用者可編輯的顯示標題。設定後，UI 以 `title2` 取代 `title` 顯示。預設為空字串。
 - `beginTime` / `endTime`: Session 的起訖時間。
 
 #### Data - turn (輪次)

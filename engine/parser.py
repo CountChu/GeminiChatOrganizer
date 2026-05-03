@@ -9,6 +9,7 @@ from .models import Archive, Session, Turn, TurnKind
 
 ACTIVITY_FILENAME = "我的活動.json"
 TITLE_MAX_CHARS = 20
+_RESOLVE_EXTS = (".jpg", ".jpeg", ".png", ".gif", ".webp", ".md", ".txt", ".pdf", ".json")
 
 _TITLE_PREFIX_TO_KIND: Dict[str, TurnKind] = {
     "Prompted": "prompted",
@@ -32,26 +33,54 @@ def _classify(title: str) -> Tuple[TurnKind, str]:
     return kind, title
 
 
-def _attachments_from_entry(entry: dict) -> List[str]:
-    attachments: List[str] = []
+def _resolve_attachment(name: str, raw_dir: Path) -> str:
+    """Resolve an attachment name against raw_dir.
+
+    Takeout sometimes lists a different extension than what's saved on disk
+    (e.g. `.png` for files saved as `.jpg`) or saves docs with no extension at
+    all (e.g. listed `Foo.md`, on disk `Foo`). Try a small set of plausible
+    alternates, then the bare stem. Falls back to the original name.
+    """
+    if (raw_dir / name).exists():
+        return name
+    stem = Path(name).stem
+    for ext in _RESOLVE_EXTS:
+        candidate = f"{stem}{ext}"
+        if candidate != name and (raw_dir / candidate).exists():
+            return candidate
+    if (raw_dir / stem).exists():
+        return stem
+    return name
+
+
+def _attachments_from_entry(entry: dict, raw_dir: Path) -> List[str]:
+    out: List[str] = []
+    seen: set[str] = set()
+
+    def add(name: str) -> None:
+        resolved = _resolve_attachment(name, raw_dir)
+        if resolved not in seen:
+            seen.add(resolved)
+            out.append(resolved)
+
     image = entry.get("imageFile")
     if isinstance(image, dict):
         name = image.get("name") or image.get("url")
         if name:
-            attachments.append(str(name))
+            add(str(name))
     elif isinstance(image, str):
-        attachments.append(image)
+        add(image)
     for af in entry.get("attachedFiles") or []:
         if isinstance(af, dict):
             name = af.get("name") or af.get("url")
             if name:
-                attachments.append(str(name))
+                add(str(name))
         elif isinstance(af, str):
-            attachments.append(af)
-    return attachments
+            add(af)
+    return out
 
 
-def _entry_to_turn(entry: dict) -> Optional[Turn]:
+def _entry_to_turn(entry: dict, raw_dir: Path) -> Optional[Turn]:
     time_raw = entry.get("time")
     if not time_raw:
         return None
@@ -77,7 +106,7 @@ def _entry_to_turn(entry: dict) -> Optional[Turn]:
         kind=kind,
         prompt=prompt,
         response=html,
-        attachments=_attachments_from_entry(entry),
+        attachments=_attachments_from_entry(entry, raw_dir),
         visibility_flag=True,
     )
 
@@ -129,7 +158,7 @@ def parse_archive(raw_dir: Path, session_gap_seconds: int) -> Archive:
             continue
         if entry.get("header") != "Gemini Apps":
             continue
-        turn = _entry_to_turn(entry)
+        turn = _entry_to_turn(entry, raw_dir)
         if turn is not None:
             turns.append(turn)
     sessions = _group_sessions(turns, session_gap_seconds)
