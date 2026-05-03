@@ -16,6 +16,9 @@ const isImage = (n) => { const i = n.lastIndexOf("."); return i >= 0 && IMG_EXTS
 const rawUrl = (n) => "/raw/" + encodeURIComponent(n);
 const turnMdUrl = (id) => "/turns_md/" + encodeURIComponent(id) + ".md";
 
+const displayTitle = (s) => (s.title || "(untitled)");
+const displayPrompt = (t) => (t.prompt2 || t.prompt || "");
+
 const $ = (sel) => document.querySelector(sel);
 const elTopicsBody = $("#topics-body");
 const elTopicsCount = $("#topics-count");
@@ -85,6 +88,7 @@ async function fetchTurnMd(turnId) {
 function renderSidebar() {
   const q = elSearch.value.trim().toLowerCase();
   const matchesQ = (s) => !q || s.title.toLowerCase().includes(q);
+  const isVisible = (s) => s.visibleCount > 0;
   const ord = state.sortDir === "desc"
     ? (a, b) => b.beginTime.localeCompare(a.beginTime)
     : (a, b) => a.beginTime.localeCompare(b.beginTime);
@@ -107,7 +111,7 @@ function renderSidebar() {
     const ul = document.createElement("ul");
     ul.className = "group-list nested";
     const memberSummaries = state.sessions
-      .filter((s) => s.topicId === tp.topicId && matchesQ(s) && !(state.hideHidden && s.visibleCount === 0))
+      .filter((s) => s.topicId === tp.topicId && matchesQ(s) && isVisible(s))
       .sort(ord);
     for (const s of memberSummaries) ul.appendChild(sessionRow(s, tp.topicId));
     tDiv.appendChild(ul);
@@ -118,7 +122,7 @@ function renderSidebar() {
   // Uncategorized group
   elUncatList.innerHTML = "";
   const uncat = state.sessions
-    .filter((s) => !s.topicId && matchesQ(s) && !(state.hideHidden && s.visibleCount === 0))
+    .filter((s) => !s.topicId && matchesQ(s) && isVisible(s))
     .sort(ord);
   for (const s of uncat) elUncatList.appendChild(sessionRow(s, null));
   elUncatCount.textContent = uncat.length;
@@ -148,7 +152,7 @@ function sessionRow(s, parentTopicId) {
     else state.selected.delete(s.sessionId);
     refreshMultiSelectBar();
   });
-  li.querySelector(".session-title").textContent = s.title || "(untitled)";
+  li.querySelector(".session-title").textContent = displayTitle(s);
   li.querySelector(".session-meta").textContent =
     `${s.beginTime.split(" ")[0]} · ${s.visibleCount}/${s.turnCount} visible`;
   li.addEventListener("click", () => loadSession(s.sessionId));
@@ -189,7 +193,7 @@ async function loadSession(id) {
 
 async function renderSessionView() {
   if (!state.current) return;
-  elSessionTitle.textContent = state.current.title || "(untitled)";
+  elSessionTitle.textContent = displayTitle(state.current);
   const range = state.current.beginTime === state.current.endTime
     ? state.current.beginTime
     : `${state.current.beginTime} → ${state.current.endTime}`;
@@ -204,12 +208,14 @@ async function renderSessionView() {
 function renderTurn(turn, turnMdText) {
   const div = document.createElement("div");
   div.className = "turn" + (turn.visibilityFlag ? "" : " hidden");
-  const promptText = turn.prompt || "(no prompt — " + turn.kind + ")";
+  const shown = displayPrompt(turn);
+  const promptText = shown || "(no prompt — " + turn.kind + ")";
   div.innerHTML = `
     <div class="turn-head">
       <button class="toggle-btn"></button>
       <span class="turn-ts"></span>
       <span class="turn-kind"></span>
+      <button class="icon-btn turn-edit" title="Edit prompt (prompt2)">✎</button>
     </div>
     <div class="turn-prompt"></div>
     <div class="turn-response"></div>
@@ -223,7 +229,12 @@ function renderTurn(turn, turnMdText) {
   btn.dataset.visible = String(turn.visibilityFlag);
   btn.textContent = turn.visibilityFlag ? "Visible" : "Hidden";
   btn.addEventListener("click", () => toggleTurn(turn.turnId, !turn.visibilityFlag));
-  div.querySelector(".turn-prompt").textContent = promptText;
+  const editBtn = div.querySelector(".turn-edit");
+  if (turn.prompt2) editBtn.classList.add("edited");
+  editBtn.addEventListener("click", () => editTurnPrompt(turn.turnId));
+  const promptEl = div.querySelector(".turn-prompt");
+  promptEl.textContent = promptText;
+  if (turn.prompt2) promptEl.classList.add("edited");
   const respEl = div.querySelector(".turn-response");
   if (state.mdPreview && turnMdText && typeof marked !== "undefined") {
     respEl.classList.add("preview");
@@ -266,6 +277,27 @@ function renderTurn(turn, turnMdText) {
     }
   }
   return div;
+}
+
+async function editTurnPrompt(turnId) {
+  if (!state.current) return;
+  const turn = state.current.turns.find((tt) => tt.turnId === turnId);
+  if (!turn) return;
+  const current = turn.prompt2 || "";
+  const next = prompt(`Edit displayed prompt (clear to revert to original).\nOriginal:\n${turn.prompt || "(empty)"}`, current);
+  if (next === null) return;
+  const prompt2 = next.trim();
+  if (prompt2 === current) return;
+  try {
+    setStatus("saving…");
+    await api(`/api/sessions/${state.current.sessionId}/turns/${turnId}/prompt2`, {
+      method: "PATCH", body: JSON.stringify({ prompt2 }),
+    });
+    turn.prompt2 = prompt2;
+    turnMdCache.delete(turnId);
+    await renderSessionView();
+    setStatus("saved");
+  } catch (e) { setStatus(e.message, true); }
 }
 
 async function toggleTurn(turnId, visible) {
@@ -322,7 +354,7 @@ function renderTopicView() {
       <button class="ts-open">Open</button>
       <button class="ts-remove" title="Remove from this Topic">×</button>
     `;
-    li.querySelector(".ts-title").textContent = s.title || "(untitled)";
+    li.querySelector(".ts-title").textContent = displayTitle(s);
     li.querySelector(".ts-meta").textContent = `${s.sessionId} · ${s.visibleCount}/${s.turnCount} visible`;
     li.querySelector(".up").addEventListener("click", () => reorder(idx, idx - 1));
     li.querySelector(".down").addEventListener("click", () => reorder(idx, idx + 1));

@@ -62,7 +62,7 @@ sessionIds = [sessionId]
 **Syntax**
 
 ```
-session = {sessionId, title, title2, beginTime, endTime, turns}
+session = {sessionId, title, beginTime, endTime, turns}
 turns = [turn]
 ```
 
@@ -70,7 +70,6 @@ turns = [turn]
 
 - `sessionId`: 唯一識別碼。
 - `title`: Session 標題，預設由首句擷取生成。
-- `title2`: 使用者可編輯的顯示標題。設定後，UI 以 `title2` 取代 `title` 顯示。預設為空字串。
 - `beginTime` / `endTime`: Session 的起訖時間。
 
 #### Data - turn (輪次)
@@ -80,13 +79,15 @@ turns = [turn]
 **Syntax**
 
 ```
-turn = {turnId, timestamp, timestampUtc, kind, prompt, response, attachments, visibilityFlag}
+turn = {turnId, timestamp, timestampUtc, kind, prompt, prompt2, response, attachments, visibilityFlag}
 ```
 
 **Fields**
 
 - `timestamp`：本地時間的顯示欄位。適用 `YYYY-MM-DD HH:mm:ss` 格式規範；顯示於 Markdown 導出文件中。
 - `timestampUtc`：直接保留自 Takeout 的原始值。作為排序與識別的基準鍵；用於推導 `turnId`（`T{unix_seconds}` 格式）以及計算 Session 切分的時間間隔。
+- `prompt`：來自 Takeout 的原始 prompt 文字，不可變更。
+- `prompt2`：使用者可編輯的 prompt 文字。設定後，UI 與 Markdown 匯出皆以 `prompt2` 取代 `prompt` 顯示。預設為空字串。
 
 **命名與數據結構規範**
 

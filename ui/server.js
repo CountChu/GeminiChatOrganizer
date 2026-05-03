@@ -60,6 +60,9 @@ app.get("/api/sessions/:id", asHandler(async (req) => bridge.send("get_session",
 app.post("/api/sessions/:id/turns/:tid/visibility", asHandler(async (req) =>
   bridge.send("toggle_turn", { sessionId: req.params.id, turnId: req.params.tid, visible: !!req.body.visible })
 ));
+app.patch("/api/sessions/:id/turns/:tid/prompt2", asHandler(async (req) =>
+  bridge.send("update_turn_prompt", { sessionId: req.params.id, turnId: req.params.tid, prompt2: req.body?.prompt2 ?? "" })
+));
 
 app.get("/api/topics", asHandler(async () => bridge.send("list_topics", {})));
 app.post("/api/topics", asHandler(async (req) => bridge.send("create_topic", {

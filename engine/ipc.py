@@ -6,11 +6,13 @@ import traceback
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
+from jinja2 import Environment, StrictUndefined
+
 from . import topic_mgr
 from .exporter import export_archive, load_session, load_template_config
 from .models import Session, SessionSummary, Topic, TopicSummary
 from .parser import merge_visibility, parse_archive, write_sessions
-from .render_md import render_all
+from .render_md import render_all, render_turn
 
 
 class State:
@@ -92,6 +94,23 @@ def cmd_list_sessions(state: State, _args: dict) -> dict:
 def cmd_get_session(state: State, args: dict) -> dict:
     sid = args["sessionId"]
     return {"session": state.get_session(sid).model_dump(by_alias=True)}
+
+
+def cmd_update_turn_prompt(state: State, args: dict) -> dict:
+    sid = args["sessionId"]
+    tid = args["turnId"]
+    prompt2 = str(args.get("prompt2", "")).strip()
+    session = state.get_session(sid)
+    target = next((t for t in session.turns if t.turn_id == tid), None)
+    if target is None:
+        raise KeyError(f"turn {tid} not found in session {sid}")
+    target.prompt2 = prompt2
+    state.write_session(session)
+    template_cfg = load_template_config(state.template_path)
+    env = Environment(undefined=StrictUndefined, autoescape=False)
+    md_path = state.turns_md_dir / f"{tid}.md"
+    md_path.write_text(render_turn(target, template_cfg, env), encoding="utf-8")
+    return {"sessionId": sid, "turnId": tid, "prompt2": prompt2}
 
 
 def cmd_toggle_turn(state: State, args: dict) -> dict:
@@ -214,6 +233,7 @@ COMMANDS: Dict[str, Callable[[State, dict], dict]] = {
     "list_sessions": cmd_list_sessions,
     "get_session": cmd_get_session,
     "toggle_turn": cmd_toggle_turn,
+    "update_turn_prompt": cmd_update_turn_prompt,
     "list_topics": cmd_list_topics,
     "get_topic": cmd_get_topic,
     "create_topic": cmd_create_topic,

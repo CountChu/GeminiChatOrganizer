@@ -17,9 +17,14 @@ class Turn(_CamelModel):
     timestamp_utc: str = Field(alias="timestampUtc")  # original ISO-8601 from Takeout
     kind: TurnKind = "prompted"
     prompt: str = ""
+    prompt2: str = ""
     response: str = ""  # raw HTML from Gemini; the Renderer turns this into MD
     attachments: List[str] = Field(default_factory=list)
     visibility_flag: bool = Field(default=True, alias="visibilityFlag")
+
+    @property
+    def display_prompt(self) -> str:
+        return self.prompt2 or self.prompt
 
 
 class Session(_CamelModel):

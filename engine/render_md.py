@@ -32,16 +32,17 @@ def render_turn(turn: Turn, template_cfg: dict, env: Environment) -> str:
     prompt_block_tpl = env.from_string(template_cfg.get("prompt_block", "**Prompt:**\n\n{{ prompt }}"))
     response_block_tpl = env.from_string(template_cfg.get("response_block", "**Response:**\n\n{{ response_md }}"))
     response_md = html_to_markdown(turn.response) if turn.response else ""
+    display_prompt = turn.display_prompt
     ctx = {
         "timestamp": turn.timestamp,
         "kind": turn.kind,
-        "prompt": turn.prompt,
-        "prompt_preview": _prompt_preview(turn.prompt),
+        "prompt": display_prompt,
+        "prompt_preview": _prompt_preview(display_prompt),
         "response_md": response_md,
         "turnId": turn.turn_id,
     }
     parts: List[str] = [turn_header_tpl.render(**ctx)]
-    if turn.prompt:
+    if display_prompt:
         parts.append(prompt_block_tpl.render(**ctx))
     if response_md:
         parts.append(response_block_tpl.render(**ctx))

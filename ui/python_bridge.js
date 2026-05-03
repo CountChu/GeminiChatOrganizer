@@ -4,6 +4,7 @@ const crypto = require("crypto");
 
 const WRITE_CMDS = new Set([
   "toggle_turn",
+  "update_turn_prompt",
   "create_topic",
   "update_topic",
   "delete_topic",

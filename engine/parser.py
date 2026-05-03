@@ -177,13 +177,20 @@ def merge_visibility(archive: Archive, sessions_dir: Path) -> Archive:
         except Exception:
             continue
         flags: Dict[str, bool] = {}
+        prompt2s: Dict[str, str] = {}
         for t in existing.get("turns", []):
             tid = t.get("turnId", t.get("turn_id"))
-            if tid is not None:
-                flags[tid] = bool(t.get("visibilityFlag", t.get("visibility_flag", True)))
+            if tid is None:
+                continue
+            flags[tid] = bool(t.get("visibilityFlag", t.get("visibility_flag", True)))
+            p2 = t.get("prompt2", "")
+            if p2:
+                prompt2s[tid] = p2
         for turn in session.turns:
             if turn.turn_id in flags:
                 turn.visibility_flag = flags[turn.turn_id]
+            if turn.turn_id in prompt2s:
+                turn.prompt2 = prompt2s[turn.turn_id]
     return archive
 
 

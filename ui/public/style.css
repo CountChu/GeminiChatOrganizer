@@ -45,8 +45,10 @@ main { display: grid; grid-template-columns: 300px 280px 1fr; height: calc(100vh
 
 #topic-content .topic-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 #topic-content #topic-title { margin: 0; }
-#topic-content .icon-btn { border: 1px solid #ccc; background: #fff; cursor: pointer; padding: 2px 8px; border-radius: 4px; font-size: 13px; }
-#topic-content .icon-btn:hover { background: #f0f0f0; }
+.icon-btn { border: 1px solid #ccc; background: #fff; cursor: pointer; padding: 2px 8px; border-radius: 4px; font-size: 13px; }
+.icon-btn:hover { background: #f0f0f0; }
+.turn-edit.edited { background: #fff7e0; border-color: #d4a017; }
+.turn-prompt.edited { border-left: 3px solid #d4a017; padding-left: 8px; }
 #topic-content #topic-meta { color: #888; font-size: 12px; margin-bottom: 8px; }
 #topic-content #topic-description { width: 100%; padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; font: inherit; font-size: 13px; resize: vertical; margin-bottom: 12px; }
 #topic-content .topic-actions { display: flex; gap: 8px; margin-bottom: 24px; }
