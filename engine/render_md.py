@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import List
 
@@ -71,14 +72,24 @@ def render_all(sessions_dir: Path, turns_md_dir: Path, template_path: Path) -> d
     rendered = 0
     skipped = 0
     sessions = 0
-    for session_path in sorted(sessions_dir.glob("session_*.json")):
+    session_paths = sorted(sessions_dir.glob("session_*.json"))
+    total_sessions = len(session_paths)
+    print(f"render: scanning {total_sessions} sessions in {sessions_dir}", file=sys.stderr, flush=True)
+    for i, session_path in enumerate(session_paths, start=1):
         session = _load_session(session_path)
         sessions += 1
-        for turn in session.turns:
+        pending = [t for t in session.turns if not (turns_md_dir / f"{t.turn_id}.md").exists()]
+        to_render = len(pending)
+        skipped += len(session.turns) - to_render
+        if to_render == 0:
+            continue
+        print(f"render: [{i}/{total_sessions}] {session_path.name}: {to_render} turn(s)", file=sys.stderr, flush=True)
+        done = 0
+        for turn in pending:
             md_path = turns_md_dir / f"{turn.turn_id}.md"
-            if md_path.exists():
-                skipped += 1
-                continue
             md_path.write_text(render_turn(turn, template_cfg, env), encoding="utf-8")
             rendered += 1
+            done += 1
+            if to_render >= 50 and done % 25 == 0 and done < to_render:
+                print(f"render:     {done}/{to_render} turns…", file=sys.stderr, flush=True)
     return {"rendered": rendered, "skipped": skipped, "sessions": sessions}

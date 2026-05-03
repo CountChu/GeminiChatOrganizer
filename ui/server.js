@@ -27,6 +27,7 @@ console.log("Pre-rendering per-Turn MD cache...");
 const render = spawnSync(PYTHON_PATH, ["-m", "engine.cli", "render", "--config", CONFIG_PATH], {
   cwd: REPO_ROOT,
   stdio: ["ignore", "inherit", "inherit"],
+  env: { ...process.env, PYTHONUNBUFFERED: "1" },
 });
 if (render.status !== 0) {
   console.error(`Renderer exited with code ${render.status}; aborting startup.`);

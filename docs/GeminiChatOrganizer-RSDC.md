@@ -82,6 +82,11 @@ turns = [turn]
 turn = {turnId, timestamp, timestampUtc, kind, prompt, response, attachments, visibilityFlag}
 ```
 
+**Fields**
+
+- `timestamp`: Local-time display field. Governs the `YYYY-MM-DD HH:mm:ss` format rule; shown in Markdown exports.
+- `timestampUtc`: Verbatim Takeout value. Canonical ordering key; used to derive `turnId` (`T{unix_seconds}`) and to compute gaps for Session segmentation.
+
 **Naming and Data-Structure Rules**
 
 - **Timestamp Format**: Uniformly use the `YYYY-MM-DD HH:mm:ss` format.

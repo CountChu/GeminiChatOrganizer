@@ -82,6 +82,11 @@ turns = [turn]
 turn = {turnId, timestamp, timestampUtc, kind, prompt, response, attachments, visibilityFlag}
 ```
 
+**Fields**
+
+- `timestamp`：本地時間的顯示欄位。適用 `YYYY-MM-DD HH:mm:ss` 格式規範；顯示於 Markdown 導出文件中。
+- `timestampUtc`：直接保留自 Takeout 的原始值。作為排序與識別的基準鍵；用於推導 `turnId`（`T{unix_seconds}` 格式）以及計算 Session 切分的時間間隔。
+
 **命名與數據結構規範**
 
 - **時間戳規範**：統一使用 YYYY-MM-DD HH:mm:ss 格式。
