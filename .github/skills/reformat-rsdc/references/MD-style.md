@@ -9,7 +9,7 @@ When creating or editing Markdown files in this repo:
 
 ## Transforms applied by reformat_tw.py
 
-The reformat script ([.claude/skills/sync-rsdc/scripts/reformat_tw.py](../scripts/reformat_tw.py)) operationalizes the rules above through these transforms, in order:
+The reformat script ([.github/skills/reformat-rsdc/references/scripts/reformat_tw.py](./scripts/reformat_tw.py)) operationalizes the rules above through these transforms, in order:
 
 1. Strips Markdown trailing two-space hard-break sequences from every line.
 2. Detects whether the input is a raw Word/Docs paste — looks for `**`-wrapped headers, `\.` escapes, `\-` escapes in headers, or `*` bullets. If none are present, the file is already clean and the script enters idempotent-only mode (skip transforms 3–7; just inline-code missed identifiers in body text). This makes re-running on a clean file a true no-op.

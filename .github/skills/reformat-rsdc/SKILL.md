@@ -1,6 +1,6 @@
 ---
-name: sync-rsdc
-description: "Reformat docs/GeminiChatOrganizer-RSDC-tw.md (Traditional Chinese, the authored source) to follow CLAUDE.md's Markdown style rules
+name: reformat-rsdc
+description: "Reformat docs/GeminiChatOrganizer-RSDC-tw.md (Traditional Chinese, the authored source) to follow CLAUDE.md's Markdown style rules"
 ---
 
 # MUST FOLLOW
@@ -26,15 +26,15 @@ description: "Reformat docs/GeminiChatOrganizer-RSDC-tw.md (Traditional Chinese,
   - In headers, write numbered prefixes plainly (`1. name`), not escaped (`1\. name`).
   - Wrap directory trees, ASCII diagrams, and other preformatted blocks in fenced code blocks so characters like `#` and `_` render literally and don't need backslash escapes.
 
-- Audit [reformat_tw.py](./scripts/reformat_tw.py) against the rules just anchored. Confirm each rule in [references/MD-style.md](./references/MD-style.md) has a corresponding transform in the script (`*` → `-` bullets, `**…**` header strip, `1\. ` → `1. ` un-escape, fenced code blocks for preformatted content). If a rule has no matching transform — or the script enforces a rule not in `MD-style.md` — stop and surface the gap before running Step 1. Do not edit the script in this skill; flag it for a separate change.
+- Audit [reformat_tw.py](./references/scripts/reformat_tw.py) against the rules just anchored. Confirm each rule in [references/MD-style.md](./references/MD-style.md) has a corresponding transform in the script (`*` → `-` bullets, `**…**` header strip, `1\. ` → `1. ` un-escape, fenced code blocks for preformatted content). If a rule has no matching transform — or the script enforces a rule not in `MD-style.md` — stop and surface the gap before running Step 1. Do not edit the script in this skill; flag it for a separate change.
 
 ## Step 1 - Reformat TW
 
 - Read the current TW file [docs/GeminiChatOrganizer-RSDC-tw.md](../../../docs/GeminiChatOrganizer-RSDC-tw.md) end-to-end first, so you can describe what changed after the script runs.
 
-- Run the script [reformat_tw.py](./scripts/reformat_tw.py) to apply every Markdown-style transformation in one pass:
+- Run the script [reformat_tw.py](./references/scripts/reformat_tw.py) to apply every Markdown-style transformation in one pass:
   ```bash
-  python3 .claude/skills/sync-rsdc/scripts/reformat_tw.py docs/GeminiChatOrganizer-RSDC-tw.md
+  python3 .github/skills/reformat-rsdc/references/scripts/reformat_tw.py docs/GeminiChatOrganizer-RSDC-tw.md
   ```
   - Argument is the path to the TW file. The script edits in place.
   - The script writes `reformatted <path>` to stdout and exits `0` on success, `1` if the file is missing, `2` on bad arguments.

@@ -18,7 +18,7 @@ Transformations:
      in body text (skipped inside code fences).
 
 Usage:
-    python .claude/skills/sync-rsdc/scripts/reformat_tw.py docs/GeminiChatOrganizer-RSDC-tw.md
+    python3 .github/skills/reformat-rsdc/references/scripts/reformat_tw.py docs/GeminiChatOrganizer-RSDC-tw.md
 """
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ INLINE_TOKENS = [
     "data/3-topics/", "data/4-exports/",
     "sync_config.yaml", "export_template.yaml",
     "parser.py", "topic_mgr.py", "render_md.py", "exporter.py",
-    "visibilityFlag", "timestampUtc", "sessionIds",
+    "visibilityFlag", "timestamp", "timestampUtc", "sessionIds",
     "sessionId", "topicId", "turnId", "beginTime", "endTime",
     "rawDir", "sessionsDir", "turnsMdDir", "topicsDir",
     "exportsDir", "sessionGapSeconds",
@@ -51,6 +51,7 @@ BODY_ESCAPES = [
     (r"\\\*", "*"),
     (r"\\=", "="),
     (r"\\\+", "+"),
+    (r"\\\\n", "\\n"),
 ]
 
 

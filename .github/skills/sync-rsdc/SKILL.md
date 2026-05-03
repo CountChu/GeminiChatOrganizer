@@ -1,6 +1,6 @@
 ---
 name: sync-rsdc
-description: "Regenerate docs/GeminiChatOrganizer-RSDC.md (English mirror) from docs/GeminiChatOrganizer-RSDC-tw.md.
+description: "Regenerate docs/GeminiChatOrganizer-RSDC.md (English mirror) from docs/GeminiChatOrganizer-RSDC-tw.md."
 ---
 
 # MUST FOLLOW
@@ -19,7 +19,7 @@ description: "Regenerate docs/GeminiChatOrganizer-RSDC.md (English mirror) from 
     || { echo "error: docs/GeminiChatOrganizer-RSDC-tw.md not found" >&2; exit 1; }
   ```
 
-- Confirm the EN file exists. Bail out immediately if it doesn't — Step 2 rewrites it, so a missing file is a setup error worth catching up front:
+- Confirm the EN file exists. Bail out immediately if it doesn't — Step 1 rewrites it, so a missing file is a setup error worth catching up front:
   ```bash
   test -f docs/GeminiChatOrganizer-RSDC.md \
     || { echo "error: docs/GeminiChatOrganizer-RSDC.md not found" >&2; exit 1; }
@@ -80,7 +80,7 @@ description: "Regenerate docs/GeminiChatOrganizer-RSDC.md (English mirror) from 
 What skills do you have?
 ```
 
-## Prompt 1
+## Prompt 2
 
 ```
 /sync-rsdc
@@ -92,7 +92,7 @@ What skills do you have?
 TW only — I'll review before you touch EN.
 ```
 
-(Skip Step 2; after Step 1, end with a one-line offer: "TW reformatted; EN is now stale — want me to sync it too?")
+(Skip Step 1; after Step 0, end with a one-line offer: "TW reformatted; EN is now stale — want me to sync it too?")
 
 # Prompts for Developing
 
