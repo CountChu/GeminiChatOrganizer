@@ -79,7 +79,7 @@ main { display: grid; grid-template-columns: 300px 280px 1fr; height: calc(100vh
 .toggle-btn[data-visible="false"] { background: #fdecea; color: #a33; }
 .turn-prompt { font-weight: 500; margin: 6px 0; white-space: pre-wrap; word-break: break-word; }
 .turn-response { color: #333; max-height: 320px; overflow: auto; background: #fafafa; padding: 8px 12px; border-radius: 4px; white-space: pre-wrap; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
-.turn-response.preview { white-space: normal; font-family: inherit; font-size: 13px; line-height: 1.5; }
+.turn-response.preview { white-space: normal; font-family: inherit; font-size: 13px; line-height: 1.5; max-height: none; overflow: visible; }
 .turn-response.preview h1, .turn-response.preview h2, .turn-response.preview h3, .turn-response.preview h4 { margin: 0.6em 0 0.3em; }
 .turn-response.preview p { margin: 0.4em 0; }
 .turn-response.preview ul, .turn-response.preview ol { margin: 0.3em 0; padding-left: 1.6em; }
