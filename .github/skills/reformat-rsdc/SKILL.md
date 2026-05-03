@@ -71,52 +71,6 @@ What skills do you have?
 ## Prompt 2
 
 ```
-/sync-rsdc
-```
-
-## Prompt 3
-
-```
 I just re-pasted docs/GeminiChatOrganizer-RSDC-tw.md from Google Docs.
 Run /sync-rsdc.
-```
-
-## Prompt 4
-
-```
-TW only — I'll review before you touch EN.
-```
-
-(Skip Step 2; after Step 1, end with a one-line offer: "TW reformatted; EN is now stale — want me to sync it too?")
-
-# Prompts for Developing
-
-## Prompt 1
-
-```
-Show me the diff between the new EN and the prior EN, grouped by section, so I can spot any wording I want to revert.
-```
-
-## Prompt 2
-
-```
-Re-run /sync-rsdc but this time use "Owner" instead of "Primary Owner" in the §3.2 table header. Update the glossary in SKILL.md too.
-```
-
-## Prompt 3
-
-```
-The TW now has a new §2.5 — make sure /sync-rsdc creates the matching §2.5 in EN and add the term to the glossary.
-```
-
-## Prompt 4
-
-```
-Add a new style grep to the verification step: catch lines that look like a header followed by trailing whitespace.
-```
-
-## Prompt 5
-
-```
-Extend reformat_tw.py to also fence ASCII flow diagrams (lines containing `→` between identifier-like tokens).
 ```
