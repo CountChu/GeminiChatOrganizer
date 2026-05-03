@@ -2,6 +2,16 @@ const { spawn } = require("child_process");
 const readline = require("readline");
 const crypto = require("crypto");
 
+const WRITE_CMDS = new Set([
+  "toggle_turn",
+  "create_topic",
+  "update_topic",
+  "delete_topic",
+  "add_sessions_to_topic",
+  "remove_sessions_from_topic",
+  "reorder_topic_sessions",
+]);
+
 class PythonBridge {
   constructor({ pythonPath, repoRoot, configPath }) {
     this.pythonPath = pythonPath;
@@ -42,7 +52,7 @@ class PythonBridge {
 
   send(cmd, args) {
     if (!this.proc) throw new Error("python bridge not started");
-    if (cmd === "toggle_turn" && this.exportInFlight) {
+    if (WRITE_CMDS.has(cmd) && this.exportInFlight) {
       return Promise.reject(Object.assign(new Error("locked"), { code: "locked" }));
     }
     const id = crypto.randomBytes(6).toString("hex");

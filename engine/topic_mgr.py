@@ -38,6 +38,7 @@ def load_topic(topics_dir: Path, topic_id: str) -> Topic:
 
 
 def save_topic(topic: Topic, topics_dir: Path) -> Path:
+    topic.updated_at = _now()
     topics_dir.mkdir(parents=True, exist_ok=True)
     path = _topic_path(topics_dir, topic.topic_id)
     path.write_text(topic.model_dump_json(indent=2, by_alias=True), encoding="utf-8")

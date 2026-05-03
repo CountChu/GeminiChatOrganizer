@@ -4,12 +4,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository status
 
-This repo is **spec-only**. There is no source code, package manifest, build system, or test suite yet. The only content is the RSDC specification under [docs/](docs/):
+The two-process architecture from §3 of the spec is implemented:
+
+- [engine/](engine/) — Python core: `parser.py`, `topic_mgr.py`, `render_md.py`, `exporter.py`, plus `models.py` (pydantic), `ipc.py` (JSON-over-stdio), `cli.py`.
+- [ui/](ui/) — Node.js bridge ([ui/server.js](ui/server.js), [ui/python_bridge.js](ui/python_bridge.js)) and browser front-end under [ui/public/](ui/public/).
+- [data/](data/) — live working dataset under `0-raw/`, `1-sessions/`, `2-turns_md/`, `3-topics/`, `4-exports/`.
+- [sync_config.yaml](sync_config.yaml) and [export_template.yaml](export_template.yaml) — the two configs from §2.2.
+- [requirements.txt](requirements.txt) (Python deps) and [ui/package.json](ui/package.json) (Node deps).
+
+The RSDC specification under [docs/](docs/) is the authoritative source for architecture and rules:
 
 - [docs/GeminiChatOrganizer-RSDC.md](docs/GeminiChatOrganizer-RSDC.md) — English, authoritative.
 - [docs/GeminiChatOrganizer-RSDC-tw.md](docs/GeminiChatOrganizer-RSDC-tw.md) — Traditional Chinese mirror. Keep both in sync when the spec changes.
 
-Before scaffolding anything, read the spec in full — it constrains architecture, not just features.
+Read the spec before making non-trivial changes — it constrains architecture, not just features.
 
 ## What the product does
 
@@ -40,9 +48,4 @@ These are the constraints most likely to be violated by default implementations 
 
 ## Markdown style
 
-When creating or editing Markdown files in this repo:
-
-- Use `-` for unordered list items, not `*`.
-- Do not wrap header text in `**` (headers are already styled by their `#` level).
-- In headers, write numbered prefixes plainly as `1. name` — do not escape the period as `1\. name`.
-- Wrap directory trees, ASCII diagrams, and other preformatted blocks in a fenced code block so characters like `#` and `_` render literally and don't need backslash escapes.
+When creating or editing Markdown files in this repo, follow the rules in [.claude/skills/sync-rsdc/references/MD-style.md](.claude/skills/sync-rsdc/references/MD-style.md).
