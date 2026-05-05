@@ -7,9 +7,9 @@ const state = {
   view: "empty",        // empty | turns | topic
   sortDir: "asc",
   topicSortDir: "asc",
-  hideHidden: false,
-  hideMissing: false,
-  mdPreview: false,
+  hideHidden: true,
+  hideMissing: true,
+  mdPreview: true,
 };
 const turnMdCache = new Map();
 
@@ -163,7 +163,7 @@ function renderSidebar() {
     ul.className = "group-list nested";
     const memberSummaries = state.sessions
       .filter((s) => s.topicId === tp.topicId && matchesQ(s) && isVisible(s))
-      .sort(ord);
+      .sort((a, b) => a.beginTime.localeCompare(b.beginTime));
     for (const s of memberSummaries) ul.appendChild(sessionRow(s, tp.topicId));
     tDiv.appendChild(ul);
     elTopicsBody.appendChild(tDiv);
@@ -337,7 +337,7 @@ async function editTurnPrompt(turnId) {
   if (!state.current) return;
   const turn = state.current.turns.find((tt) => tt.turnId === turnId);
   if (!turn) return;
-  const current = turn.prompt2 || "";
+  const current = turn.prompt2 || turn.prompt || "";
   const next = prompt(`Edit displayed prompt (clear to revert to original).\nOriginal:\n${turn.prompt || "(empty)"}`, current);
   if (next === null) return;
   const prompt2 = next.trim();
