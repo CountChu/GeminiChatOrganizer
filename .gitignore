@@ -2,9 +2,6 @@
 __pycache__/
 *.pyc
 node_modules/
-data/1-sessions/
-data/2-turns_md/
-data/3-topics/
-data/4-exports/
 .DS_Store
 data
+data-0504

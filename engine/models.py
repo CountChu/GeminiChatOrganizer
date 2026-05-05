@@ -21,6 +21,7 @@ class Turn(_CamelModel):
     response: str = ""  # raw HTML from Gemini; the Renderer turns this into MD
     attachments: List[str] = Field(default_factory=list)
     visibility_flag: bool = Field(default=True, alias="visibilityFlag")
+    missing: bool = False
 
     @property
     def display_prompt(self) -> str:
@@ -40,8 +41,16 @@ class Session(_CamelModel):
 
     @property
     def display_title(self) -> str:
-        if self.turns and self.turns[0].prompt2:
-            return self.turns[0].prompt2
+        for t in self.turns:
+            if not t.visibility_flag:
+                continue
+            if t.prompt2:
+                return t.prompt2
+            if t.prompt:
+                first_line = " ".join(t.prompt.strip().splitlines())
+                if first_line:
+                    return first_line[:20]
+            return self.title
         return self.title
 
 
@@ -58,6 +67,7 @@ class SessionSummary(_CamelModel):
     last_active_time: str = Field(alias="endTime")
     turn_count: int = Field(alias="turnCount")
     visible_count: int = Field(alias="visibleCount")
+    missing_count: int = Field(default=0, alias="missingCount")
     topic_id: Optional[str] = Field(default=None, alias="topicId")
 
 

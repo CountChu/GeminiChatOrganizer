@@ -9,7 +9,7 @@ import yaml
 from . import topic_mgr
 from .exporter import export_archive, load_all_sessions, load_template_config
 from .ipc import State, serve
-from .parser import merge_visibility, parse_archive, write_sessions
+from .parser import parse_with_diff, write_sessions
 from .render_md import render_all
 
 
@@ -25,6 +25,7 @@ def _state_from_args(args: argparse.Namespace) -> State:
     topics_dir = Path(args.topics_dir or cfg.get("topicsDir", "data/3-topics"))
     exports_dir = Path(args.exports_dir or cfg.get("exportsDir", "data/4-exports"))
     gap = int(args.gap_seconds or cfg.get("sessionGapSeconds", 1800))
+    sync_strategy = args.sync_strategy or cfg.get("syncStrategy", "archive")
     template_path = Path(args.template or "export_template.yaml")
     return State(
         raw_dir=raw_dir,
@@ -33,14 +34,19 @@ def _state_from_args(args: argparse.Namespace) -> State:
         topics_dir=topics_dir,
         exports_dir=exports_dir,
         gap_seconds=gap,
+        sync_strategy=sync_strategy,
         template_path=template_path,
     )
 
 
 def cmd_parse(args: argparse.Namespace) -> int:
     state = _state_from_args(args)
-    archive = parse_archive(state.raw_dir, state.gap_seconds)
-    merge_visibility(archive, state.sessions_dir)
+    archive = parse_with_diff(
+        state.raw_dir,
+        state.sessions_dir,
+        state.gap_seconds,
+        state.sync_strategy,
+    )
     written = write_sessions(archive, state.sessions_dir)
     render_stats = render_all(state.sessions_dir, state.turns_md_dir, state.template_path)
     print(f"sessions: {len(archive.sessions)}", file=sys.stderr)
@@ -93,6 +99,7 @@ def main(argv=None) -> int:
     common.add_argument("--topics-dir", dest="topics_dir")
     common.add_argument("--exports-dir", dest="exports_dir")
     common.add_argument("--gap-seconds", dest="gap_seconds", type=int)
+    common.add_argument("--sync-strategy", dest="sync_strategy", choices=["archive", "mirror"])
     common.add_argument("--template", default="export_template.yaml")
 
     p_parse = sub.add_parser("parse", parents=[common])

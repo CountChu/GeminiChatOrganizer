@@ -7,6 +7,7 @@ const state = {
   view: "empty",        // empty | turns | topic
   sortDir: "asc",
   hideHidden: false,
+  hideMissing: false,
   mdPreview: false,
 };
 const turnMdCache = new Map();
@@ -16,8 +17,21 @@ const isImage = (n) => { const i = n.lastIndexOf("."); return i >= 0 && IMG_EXTS
 const rawUrl = (n) => "/raw/" + encodeURIComponent(n);
 const turnMdUrl = (id) => "/turns_md/" + encodeURIComponent(id) + ".md";
 
-const displayTitle = (s) =>
-  s.displayTitle || (s.turns && s.turns[0] && s.turns[0].prompt2) || s.title || "(untitled)";
+function displayTitle(s) {
+  if (s.displayTitle) return s.displayTitle;
+  if (s.turns) {
+    for (const t of s.turns) {
+      if (!t.visibilityFlag) continue;
+      if (t.prompt2) return t.prompt2;
+      if (t.prompt) {
+        const line = t.prompt.split(/\r?\n/, 1)[0].trim();
+        if (line) return line.slice(0, 20);
+      }
+      break;
+    }
+  }
+  return s.title || "(untitled)";
+}
 const displayPrompt = (t) => (t.prompt2 || t.prompt || "");
 
 const ABS_URL_RE = /^(https?:|\/|#|mailto:|tel:|data:)/i;
@@ -87,13 +101,28 @@ function sessionSummary(id) { return state.sessions.find((s) => s.sessionId === 
 
 // ---------- data loading ----------
 
+function metricsString() {
+  const hiddenSessions = state.sessions.filter((s) => s.visibleCount === 0).length;
+  let totalTurns = 0, hiddenTurns = 0, missingTurns = 0;
+  for (const ss of state.sessions) {
+    totalTurns += ss.turnCount;
+    hiddenTurns += ss.turnCount - ss.visibleCount;
+    missingTurns += ss.missingCount || 0;
+  }
+  return (
+    `${state.topics.length} topics\n` +
+    `${state.sessions.length} sessions (${hiddenSessions} hidden)\n` +
+    `${totalTurns} turns (${hiddenTurns} hidden, ${missingTurns} missing)`
+  );
+}
+
 async function loadAll() {
   setStatus("loading…");
   const [s, t] = await Promise.all([api("/api/sessions"), api("/api/topics")]);
   state.sessions = s.sessions;
   state.topics = t.topics;
   renderSidebar();
-  setStatus(`${state.sessions.length} sessions · ${state.topics.length} topics`);
+  setStatus("");
 }
 
 async function fetchTurnMd(turnId) {
@@ -221,7 +250,9 @@ async function renderSessionView() {
   elSessionMeta.textContent =
     `${state.current.sessionId} · ${range} · ${state.current.turns.length} turns`;
   elTurnsList.innerHTML = "";
-  const visibleTurns = state.current.turns.filter((t) => !(state.hideHidden && !t.visibilityFlag));
+  const visibleTurns = state.current.turns.filter((t) =>
+    !(state.hideHidden && !t.visibilityFlag) && !(state.hideMissing && t.missing)
+  );
   const mdTexts = await Promise.all(visibleTurns.map((t) => fetchTurnMd(t.turnId)));
   visibleTurns.forEach((t, i) => elTurnsList.appendChild(renderTurn(t, mdTexts[i])));
 }
@@ -332,13 +363,15 @@ async function toggleTurn(turnId, visible) {
   const sid = state.current.sessionId;
   try {
     setStatus("toggling…");
-    await api(`/api/sessions/${sid}/turns/${turnId}/visibility`, {
+    const data = await api(`/api/sessions/${sid}/turns/${turnId}/visibility`, {
       method: "POST", body: JSON.stringify({ visible }),
     });
     const t = state.current.turns.find((tt) => tt.turnId === turnId);
     if (t) t.visibilityFlag = visible;
-    const summary = sessionSummary(sid);
-    if (summary) summary.visibleCount = state.current.turns.filter((tt) => tt.visibilityFlag).length;
+    if (data.summary) {
+      const i = state.sessions.findIndex((x) => x.sessionId === data.summary.sessionId);
+      if (i >= 0) state.sessions[i] = data.summary;
+    }
     await renderSessionView();
     renderSidebar();
     setStatus("saved");
@@ -556,6 +589,7 @@ async function reload() {
 // ---------- wiring ----------
 
 elSearch.addEventListener("input", renderSidebar);
+$("#metrics-btn").addEventListener("click", () => alert(metricsString()));
 $("#organize-btn").addEventListener("click", organizeAll);
 $("#reload-btn").addEventListener("click", reload);
 $("#sort-btn").addEventListener("click", () => {
@@ -566,6 +600,10 @@ $("#sort-btn").addEventListener("click", () => {
 $("#hide-hidden").addEventListener("change", (e) => {
   state.hideHidden = e.target.checked;
   renderSidebar();
+  if (state.view === "turns") renderSessionView();
+});
+$("#hide-missing").addEventListener("change", (e) => {
+  state.hideMissing = e.target.checked;
   if (state.view === "turns") renderSessionView();
 });
 $("#md-preview").addEventListener("change", (e) => {

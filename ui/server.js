@@ -40,7 +40,24 @@ bridge.start();
 const app = express();
 app.use(express.json({ limit: "1mb" }));
 app.use(express.static(path.join(__dirname, "public")));
-app.use("/raw", express.static(RAW_DIR));
+
+// Mount each `Gemini Apps YYMMDD` subdir under /raw, newest first. Express
+// static falls through on miss, so attachments referenced from any generation
+// (including ghost turns marked `missing`) stay reachable. Falls back to
+// RAW_DIR itself when rawDir already names a single date dir.
+const RAW_DIR_RE = /^Gemini Apps (\d{6})$/;
+const dateSubdirs = fs.existsSync(RAW_DIR) && fs.statSync(RAW_DIR).isDirectory()
+  ? fs.readdirSync(RAW_DIR)
+      .filter((n) => RAW_DIR_RE.test(n) && fs.statSync(path.join(RAW_DIR, n)).isDirectory())
+      .sort()
+      .reverse()
+      .map((n) => path.join(RAW_DIR, n))
+  : [];
+if (dateSubdirs.length > 0) {
+  for (const dir of dateSubdirs) app.use("/raw", express.static(dir));
+} else {
+  app.use("/raw", express.static(RAW_DIR));
+}
 app.use("/turns_md", express.static(TURNS_MD_DIR));
 
 function asHandler(fn) {

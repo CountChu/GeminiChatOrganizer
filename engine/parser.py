@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -9,6 +10,7 @@ from .models import Archive, Session, Turn, TurnKind
 
 ACTIVITY_FILENAME = "我的活動.json"
 TITLE_MAX_CHARS = 20
+RAW_DIR_PATTERN = re.compile(r"^Gemini Apps (\d{6})$")
 _RESOLVE_EXTS = (".jpg", ".jpeg", ".png", ".gif", ".webp", ".md", ".txt", ".pdf", ".json")
 
 _TITLE_PREFIX_TO_KIND: Dict[str, TurnKind] = {
@@ -202,3 +204,61 @@ def write_sessions(archive: Archive, sessions_dir: Path) -> List[Path]:
         path.write_text(session.model_dump_json(indent=2, by_alias=True), encoding="utf-8")
         written.append(path)
     return written
+
+
+def discover_raw_dirs(raw_root: Path) -> List[Path]:
+    if not raw_root.exists() or not raw_root.is_dir():
+        return []
+    matches: List[Tuple[str, Path]] = []
+    for child in raw_root.iterdir():
+        if not child.is_dir():
+            continue
+        m = RAW_DIR_PATTERN.match(child.name)
+        if m:
+            matches.append((m.group(1), child))
+    matches.sort(key=lambda pair: pair[0])
+    return [p for _, p in matches]
+
+
+def parse_with_diff(
+    raw_root: Path,
+    sessions_dir: Path,
+    gap_seconds: int,
+    sync_strategy: str = "archive",
+) -> Archive:
+    dirs = discover_raw_dirs(raw_root)
+    if not dirs:
+        # Legacy: rawDir already names a single date dir.
+        if (raw_root / ACTIVITY_FILENAME).exists():
+            archive = parse_archive(raw_root, gap_seconds)
+            merge_visibility(archive, sessions_dir)
+            return archive
+        raise FileNotFoundError(
+            f"No `Gemini Apps YYMMDD` subdirectories under {raw_root}, "
+            f"and no {ACTIVITY_FILENAME} directly inside it."
+        )
+    if len(dirs) == 1:
+        archive = parse_archive(dirs[0], gap_seconds)
+        archive.source = str(raw_root)
+        merge_visibility(archive, sessions_dir)
+        return archive
+
+    older = parse_archive(dirs[-2], gap_seconds)
+    newer = parse_archive(dirs[-1], gap_seconds)
+    old_idx: Dict[str, Turn] = {t.timestamp_utc: t for s in older.sessions for t in s.turns}
+    new_idx: Dict[str, Turn] = {t.timestamp_utc: t for s in newer.sessions for t in s.turns}
+
+    merged: List[Turn] = list(new_idx.values())
+    if sync_strategy == "archive":
+        deleted = old_idx.keys() - new_idx.keys()
+        for k in deleted:
+            ghost = old_idx[k]
+            ghost.missing = True
+            merged.append(ghost)
+
+    archive = Archive(
+        source=str(raw_root),
+        sessions=_group_sessions(merged, gap_seconds),
+    )
+    merge_visibility(archive, sessions_dir)
+    return archive

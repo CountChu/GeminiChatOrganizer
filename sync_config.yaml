@@ -1,6 +1,7 @@
-rawDir: "data/0-raw/Gemini Apps 260424"
+rawDir: "data/0-raw"
 sessionsDir: "data/1-sessions"
 turnsMdDir: "data/2-turns_md"
 topicsDir: "data/3-topics"
 exportsDir: "data/4-exports"
 sessionGapSeconds: 1800
+syncStrategy: "archive"

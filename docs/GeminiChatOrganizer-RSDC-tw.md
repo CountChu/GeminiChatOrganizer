@@ -2,40 +2,40 @@
 
 本文件定義了「Gemini 對話整理工具」的開發框架，旨在將原始的 AI 對話轉化為具備結構化價值的知識文檔。
 
-## 1. Requirements (需求) — 「解決什麼問題？」
+### 1. Requirements (需求) — 「解決什麼問題？」
 
-### 1.1 使用者對象 (Target Users)
+#### 1.1 使用者對象 (Target Users)
 
 - 頻繁與 Gemini 互動，並需要將對話內容產出為報告、筆記或開發紀錄的專業使用者。
 - 希望能在本地端保存與管理所有 AI 歷史紀錄的使用者。
 
-### 1.2 核心願景 (Core Vision)
+#### 1.2 核心願景 (Core Vision)
 
 - 消除對話中的雜訊，讓 AI 對話從「過程工具」升格為「知識資產」，並提供全流程的數位溯源。
 
-### 1.3 現狀痛點 (Current Pain Points)
+#### 1.3 現狀痛點 (Current Pain Points)
 
 - **過程雜訊過多**：對話中包含多次修錯、重複嘗試的內容，導致重點模糊。
 - **缺乏本地備份**：雲端對話搜尋不便，且刪除後無法找回。
 - **元數據缺失**：導出的文本缺乏精確的提問時間，難以還原思考脈絡。
 
-### 1.4 系統目標 (System Goals)
+#### 1.4 系統目標 (System Goals)
 
 - **全量下載與備份**：支援將雲端對話鏡像至本地路徑，落實「本地優先」存儲。
 - **精確過濾**：提供界面篩選（隱藏/顯示）特定對話輪次。
 - **脈絡保留**：強制紀錄每一輪對話的日期與時間戳。
 - **標準化產出**：最終結果轉化為標準 Markdown 格式。
 
-### 1.5 主題聚合需求 (Topic Aggregation)
+#### 1.5 主題聚合需求 (Topic Aggregation)
 
 - **碎片化問題**：解決自動切分的 Session 因中斷而散落的問題。
 - **管理維度**：提升至「專案/知識點管理」維度。
 
-## 2. Specification (規格) — 「系統的規則是什麼？」
+### 2. Specification (規格) — 「系統的規則是什麼？」
 
-### 2.1 Data Hierarchy
+#### 2.1 Data Hierarchy
 
-#### Data - topic
+##### Data - topic
 
 **定義**：由使用者手動創建的邏輯容器，用於聚合一個或多個 Session。
 
@@ -49,13 +49,13 @@ sessionIds = [sessionId]
 **Fields**
 
 - `sessionIds`: 有序列表，決定匯出時 Session 的先後順序。
-- updated: 每次對 Topic 進行異動（如增刪 Session、重排序、修改名稱）時，系統必須自動更新此時間戳。
+- `updated`: 每次對 Topic 進行異動（如增刪 Session、重排序、修改名稱）時，系統必須自動更新此時間戳。
 
-#### Data - archive (封存區)
+##### Data - archive (封存區)
 
 **定義**：系統最高的數據容器，儲存所有 Topic 與未分類的 Session。
 
-#### Data - session (對話單元)
+##### Data - session (對話單元)
 
 **定義**：一組在語意上或時間上連續的對話主題鏈。
 
@@ -69,60 +69,67 @@ turns = [turn]
 **Fields**
 
 - `sessionId`: 唯一識別碼。
-- `title`: Session 標題，預設由首句擷取生成。
+- `title`: Session 標題。預設由 Parser 生成（首輪前 20 字元），後續由 Bridge 隨第一個可見輪次的 `prompt2` 或 `prompt` 變動而動態更新。
 - `beginTime` / `endTime`: Session 的起訖時間。
 
-#### Data - turn (輪次)
+##### Data - turn (輪次)
 
 **定義**：系統中最小的邏輯互動單位。
 
 **Syntax**
 
 ```
-turn = {turnId, timestamp, timestampUtc, kind, prompt, prompt2, response, attachments, visibilityFlag}
+turn = {turnId, timestamp, timestampUtc, kind, prompt, prompt2, response, attachments, visibilityFlag, missing}
 ```
 
 **Fields**
 
-- `timestamp`：本地時間的顯示欄位。適用 `YYYY-MM-DD HH:mm:ss` 格式規範；顯示於 Markdown 導出文件中。
-- `timestampUtc`：直接保留自 Takeout 的原始值。作為排序與識別的基準鍵；用於推導 `turnId`（`T{unix_seconds}` 格式）以及計算 Session 切分的時間間隔。
-- `prompt`：來自 Takeout 的原始 prompt 文字，不可變更。
-- `prompt2`：使用者可編輯的 prompt 文字。設定後，UI 與 Markdown 匯出皆以 `prompt2` 取代 `prompt` 顯示。預設為空字串。
+- `timestamp`: 本地時間顯示欄位。統一使用 YYYY-MM-DD HH:mm:ss 格式；呈現於 Markdown 匯出中。
+- `timestampUtc`: Takeout 原始值。作為排序的正規鍵；用於推導 `turnId`（T{unix_seconds}）及計算切分間隔。
+- `kind`: 區分對話類型（如 prompted）。
+- `prompt`: 來自 Takeout 的原始文字，不可變更。
+- `prompt2`: 使用者編輯的標註／次要 `prompt`。若非空，渲染時將在 Prompt 區塊後額外輸出 Prompt2 區塊（原始 `prompt` 保持不變）。Session 的顯示標題取自**第一個可見** Turn——優先使用其 `prompt2`，否則使用其 `prompt`（首行，截斷至 20 字元）；被隱藏的 Turn 會被跳過。若無可見 Turn 產出可用字串，則退回自動推導的 `title`。預設為空字串。
+- `response`: 對話回覆內容。
+- `attachments`: 附件檔案名稱清單（如圖片）。
+- `visibilityFlag`: 控制該輪次是否參與顯示與導出。
+- `missing`: 布林值。僅由 Parser 設定為 `true`：當某 Turn 存在於次新原始目錄、卻已從最新原始目錄消失，且 `syncStrategy` 為 `archive` 時。預設為 `false`。與 `visibilityFlag` 相互獨立——使用者既有的可見性與 `prompt2` 設定不會被覆寫。
 
-**命名與數據結構規範**
+**命名與資料結構規則**
 
-- **時間戳規範**：統一使用 YYYY-MM-DD HH:mm:ss 格式。
-- **狀態屬性**：每個輪次必須具備 `visibilityFlag` (Boolean) 與 timestamp 屬性。
+- **時間戳格式**：統一使用 `YYYY-MM-DD HH:mm:ss` 格式。
+- **狀態屬性**：每個 Turn 必須攜帶 `visibilityFlag`（布林值）與 `timestamp` 屬性。
 
-### 2.2 Configurations (配置規範)
+#### 2.2 Configurations (配置規範)
 
-系統行為與數據流（Artifacts）由兩個核心 YAML 檔案控管：
+系統行為與資料流（Artifacts）由以下兩個核心 YAML 檔案所管控：
 
-#### Config - sync_config.yaml
+##### Config - sync_config.yaml
 
 定義系統路徑、數據映射與解析規則。
 
 ```yaml
-rawDir: "data/0-raw/Gemini Apps 260424"
+rawDir: "data/0-raw"
 sessionsDir: "data/1-sessions"
 turnsMdDir: "data/2-turns_md"
 topicsDir: "data/3-topics"
 exportsDir: "data/4-exports"
 sessionGapSeconds: 1800
+syncStrategy: "archive" # archive: 原始資料刪除後本地保留; mirror: 同步刪除
 ```
 
-**欄位與 Artifact 定義說明：**
+**欄位定義：**
 
-- **`rawDir` (Raw Source)**：原始數據目錄。指向 Google Takeout 的原始對話 JSON。系統以此作為唯讀源。
-- **`sessionsDir` (Processed JSON)**：結構化數據目錄。存儲經 Parser 處理後的 Session JSON。這是系統的「狀態核心」，承載內容及 `visibilityFlag`。
-- **`turnsMdDir` (UI MD Cache)**：Markdown 快取目錄。由 Renderer 產出的逐輪 Markdown 檔案，供 UI 顯示使用。
-- **`topicsDir` (Topic Metadata)**：主題定義目錄。存儲使用者定義的主題 JSON，建立 Session 間的邏輯映射。
-- **`exportsDir` (Final Artifact)**：導出目錄。最終生成的合併 Markdown 文件存放處。
-- **`sessionGapSeconds`**：切分閾值。定義兩次互動間隔超過此秒數則判定為新 Session。
+- **rawDir（原始來源）**：原始資料根目錄。包含一或多個以 `Gemini Apps YYMMDD` 命名的 Takeout 子目錄；Parser 掃描其中執行兩代差異比對。系統視為唯讀。降階相容：若 `rawDir` 本身即包含活動 JSON（無符合命名的子目錄），Parser 對該目錄執行單目錄全量解析。
+- **sessionsDir（結構化 JSON）**：結構化資料目錄。儲存系統狀態 JSON。由 Parser 寫入結構，Bridge 寫入使用者狀態（Flag/Prompt2）。為系統的「狀態核心」。
+- **turnsMdDir（UI MD 快取）**：Markdown 快取目錄。由 Renderer 產出的逐 Turn Markdown 檔案，供 UI 顯示。
+- **topicsDir（主題後設資料）**：主題定義目錄。儲存使用者定義的 Topic JSON，建立 Session 間的邏輯映射。
+- **exportsDir（最終產物）**：匯出目錄。最終合併的 Markdown 文件儲存處。
+- **sessionGapSeconds**：切分閾值。若兩相鄰互動間隔超過此秒數，視為新 Session。
+- **syncStrategy**：同步策略。archive（預設）：原始資料目錄若刪除聊天記錄，本地已解析數據予以保留；mirror：嚴格同步刪除。
 
-#### Config - export_template.yaml
+##### Config - export_template.yaml
 
-定義 Exporter 產出最終文檔時的佈局、外觀與命名規則。
+定義 Exporter 產出最終文件時的版面、外觀與命名規則。
 
 ```yaml
 timestamp_in_header: true
@@ -137,118 +144,118 @@ prompt_block: "**Prompt:**\\n\\n{{ prompt }}"
 response_block: "**Response:**\\n\\n{{ response_md }}"
 ```
 
-### 2.3 Data Flow & Logic Rules
+#### 2.3 Data Flow & Logic Rules
 
-描述系統內數據轉化管線及其內嵌邏輯：
+1. **rawDir -> sessionsDir (兩代差異比對與增量更新)**
+   - **命名慣例**：rawDir 下的子目錄以 Gemini Apps YYMMDD 格式命名。
+   - **增量比對機制**：系統解析日期並選取**日期最近的兩個子目錄**進行內容比對。
+   - **差異識別**：以「最新目錄」為基準與「次新目錄」比對。識別出新增的 Turn、編輯內容或刪除紀錄。
+   - **降階處理**：若僅存在單一原始目錄，則對該目錄執行全量解析導入。
+   - **狀態合併**：新發現的數據併入 sessionsDir。必須確保 `timestampUtc` 為唯一鍵，且**不得覆蓋**本地已存在的 `prompt2` 或 `visibilityFlag`。
+   - **刪除處理**：依據 syncStrategy 決定是否保留已在最新原始目錄中消失的數據。
+     - archive（預設）：自最新原始目錄消失的 Turn 在 `data/1-sessions/` 中予以保留，並重新標記 `missing: true`；該 Turn 的 `visibilityFlag` 與 `prompt2` 不予變更。
+     - mirror：來源刪除即觸發本地同步刪除。
+   - **自動標題生成**：取首輪 Turn 的 prompt 前 20 個字元作為預設 `title`。
+   - **產出**：產出包含內容與預設 `visibilityFlag: true` 的 Session JSON。
+2. **sessionsDir -> turnsMdDir (快取預渲染)**
+   - **Renderer** 將每一輪 Turn 渲染為單獨的 Markdown 快取，供 UI 顯示使用。
+   - 確保 UI 預覽與最終匯出使用相同的渲染引擎。
+3. **sessionsDir -> topicsDir (主題管理與標題維護)**
+   - **主題管理規則**：
+     - 使用者在 UI 中多選 Session 並指派至自訂 Topic。
+     - **排序彈性**：在 Topic 內可手動調整 Session 順序。
+     - **解散與移動**：刪除 Topic 僅解除邏輯關聯；底層 Session 不會被刪除。
+   - **動態標題邏輯**：當使用者編輯 `prompt2` 或切換可見性時，**Bridge** 必須重新推導該 Session 的 `title` 並更新至 JSON。
+   - 產出 Topic 後設資料 JSON，建立實體資料間的邏輯映射。
+4. **topicsDir -> exportsDir (最終物理合併)**
+   - **Exporter** 依據 Topic 定義順序，抓取實體快取檔案進行合併產出。
+   - 僅合併 `visibilityFlag` 為 `true` 的 Turn，產出符合範本規則的最終文件。
 
-1. **`rawDir` -> `sessionsDir` (數據解析與自動切分)**
-   - 讀取原始 Takeout JSON，執行時間戳修復與標準化。
-   - **Session 推論規則**：相鄰 Turn 間隔 > `sessionGapSeconds` (預設 1800s) 則切分為不同 Session。
-   - **自動標題生成**：擷取 Session 首輪提問前 20 字元作為預設 title。
-   - 產出包含內容與預設 `visibilityFlag`: true 的 Session JSON。
-2. **`sessionsDir` -> `turnsMdDir` (快取預渲染)**
-   - 讀取 Session 狀態，將每一輪對話（Turn）獨立渲染為 Markdown 快取檔案。
-   - 此步驟確保 UI 預覽與最終導出內容使用相同的渲染引擎。
-3. **`sessionsDir` -> `topicsDir` (主題管理與歸位)**
-   - **Topic 管理規則**：
-     - 使用者在 UI 勾選 Session 並歸類至自定義主題。
-     - **排序靈活性**：在 Topic 內部，使用者可手動調整 Session 先後順序。
-     - **解散與移動**：刪除 Topic 僅解除邏輯關聯，不刪除 Session。
-   - 產出主題定義 JSON (Topic Metadata)，建立物理數據間的邏輯映射。
-4. **`topicsDir` -> `exportsDir` (最終物理合併)**
-   - 依據主題定義之順序抓取 `turnsMdDir` 內的 Markdown 快取檔案進行合併。
-   - 僅合併 `visibilityFlag`: true 的輪次，產出最終符合模板規範的知識文檔。
+#### 2.4 UI 互動規則
 
-### 2.4 UI 互動規則
+- **即時回饋**：`visibilityFlag` 的變更須立即反映於 UI。
+- **缺失輪次過濾**：Session 視圖提供「Hide missing turns」開關，勾選時隱藏 `missing: true` 的 Turn。預設關閉（顯示缺失 Turn）。`missing` 欄位在 UI 中為唯讀；僅 Parser 在 `archive` 模式下執行兩代比對時設定。
+- **Session 自動隱藏**：若 Session 內所有 Turn 的 `visibilityFlag` 皆為 false，該 Session 須從側邊欄與搜尋結果中隱藏。
+- **批次選取**：支援批次選取 Session 進行 Topic 分類。
+- **整理動作**：使用者明確觸發匯出動作。
+  - UI 須在產出文件前要求確認。
+  - **全局鎖定**：匯出動作執行期間，**Node.js Bridge** 必須阻塞所有對 1-sessions/ 與 3-topics/ 的寫入請求，防止資料競態。
 
-- **輪次可見性切換 (Per-turn Visibility)**：
-  - 使用者可針對單一輪次（Turn）切換可見性。
-  - 系統須即時更新該輪次的 `visibilityFlag` 並立即反映在 UI 預覽中。
-- **Session 自動隱藏邏輯**：
-  - 若某個 Session 內所有輪次的 `visibilityFlag` 皆為 false，則該 Session 視為隱藏。
-  - 隱藏的 Session 不會顯示在側邊欄清單或搜尋結果中。
-- **多選模式 (Batch Select)**：支援批量選取 Session 進行 Topic 歸類。
-- **整理動作 (Organize Action)**：使用者明確觸發導出動作。
-  - UI 在產出文件前須先請求確認。
-  - **全局鎖定**：執行期間 UI 進入鎖定狀態，**禁止所有寫入操作**（包括可見性切換與主題異動），以避免數據競態。
+### 3. Design (設計) — 「系統如何架構？」
 
-## 3. Design (設計) — 「系統如何架構？」
+#### 3.1 核心組件職責
 
-### 3.1 核心組件職責
-
-- **Node.js Bridge**：負責入口管理、提供 UI Server、與 Python 核心進行 IPC 通訊、監控生命週期。**必須強制執行導出期間的寫入鎖定 (Global Write Lock)**。
+- **Node.js Bridge**：負責 IPC 通訊、UI Server、Global Write Lock、以及**輕量級狀態更新**（Flag/Prompt2/Title）。
 - **Python Processing Core**：
-  - **Parser (`parser.py`)**：負責解析原始 JSON、修復時間戳及執行 Session 切分。
-  - **Topic Manager (`topic_mgr.py`)**：負責處理主題的 CRUD 操作，並確保每次異動都更新 updated 時間戳。
-  - **Renderer (`render_md.py`)**：負責讀取 Session JSON 並生成單輪 Markdown 快取。
-  - **Exporter (`exporter.py`)**：負責讀取導出請求，依據 Topic/Session 順序合併可見的 MD 快取，生成最終產物。
+  - **Parser (`parser.py`)**：負責多路原始目錄掃描、兩代差異比對與結構化數據初步生成。
+  - **Topic Manager (`topic_mgr.py`)**：負責 Topic 的 CRUD 操作與 `updated` 時間戳更新。
+  - **Renderer (`render_md.py`)**：負責增量渲染 Markdown 快取。
+  - **Exporter (`exporter.py`)**：合併實體快取並套用範本。
 
-### 3.2 資料目錄結構
+#### 3.2 資料目錄結構
 
-系統目錄形成一條清晰的知識轉化管線。下表定義了各目錄的實體位置、所有權以及生命週期。
+系統目錄形成一條清晰的知識轉換管線。
 
-#### 目錄層級圖
+##### 目錄階層
 
 ```
 data/
-├── 0-raw/           原始 JSON 資料夾 (對應 rawDir)
-├── 1-sessions/      結構化 JSON (對應 sessionsDir)
-├── 2-turns_md/      逐輪 MD 快取 (對應 turnsMdDir)
-├── 3-topics/        主題定義 JSON (對應 topicsDir)
-└── 4-exports/       最終產出的 Markdown (對應 exportsDir)
+├── 0-raw/           原始 JSON 資料夾 (rawDir)
+├── 1-sessions/      結構化 JSON (sessionsDir)
+├── 2-turns_md/      逐 Turn MD 快取 (turnsMdDir)
+├── 3-topics/        主題定義 JSON (topicsDir)
+└── 4-exports/       最終匯出 Markdown (exportsDir)
 ```
 
-#### 目錄角色定義
+##### 目錄角色定義
 
 | 目錄 | 主要所有者 | 可變性 | 觸發時機 |
 | :---- | :---- | :---- | :---- |
 | `data/0-raw/` | 使用者 | 唯讀 | 初始導入數據 |
-| `data/1-sessions/` | Parser | 狀態可變 | 初次解析 + UI 狀態切換 |
-| `data/2-turns_md/` | Renderer | 內容不可變 | 內容變動或啟動時同步快取 |
-| `data/3-topics/` | Topic Manager | 高可變 | 使用者定義/調整主題時 |
-| `data/4-exports/` | Exporter | 唯讀產物 | 使用者執行「整理動作」後產出 |
+| `data/1-sessions/` | Parser / Bridge | 狀態可變 | 解析導入 + UI 狀態(Flag/Prompt2)切換 |
+| `data/2-turns_md/` | Renderer | 內容不可變 | 內容變動或啟動同步 |
+| `data/3-topics/` | Topic Manager | 高可變 | 使用者調整主題/順序時 |
+| `data/4-exports/` | Exporter | 唯讀產物 | 執行「整理動作」後產出 |
 
-### 3.3 執行流程
+#### 3.3 執行流程
 
-本節定義系統從啟動到導出的關鍵步驟，以及各組件間的交互關係。
+1. **啟動 (Startup)**
+   - **Node.js Bridge** (`bridge.js`) 啟動 App，讀取 `sync_config.yaml`，驗證 `data/` 目錄完整性。
+   - Bridge 呼叫 **Parser** (`parser.py`)。Parser 對 Gemini Apps YYMMDD 目錄排序，執行兩代比對，更新 `data/1-sessions/`。
+   - Bridge 呼叫 **Renderer** (`render_md.py`) 執行增量快取更新。**Renderer** 比對 `data/1-sessions/` 的修改日期與 `data/2-turns_md/` 中的既有快取，執行增量渲染以確保 UI 內容為最新。
+2. **載入 UI**
+   - Bridge 從 `data/1-sessions/` 讀取 Session 列表，過濾所有 Turn 均不可見的 Session。
+   - Bridge 從 `data/3-topics/` 讀取 Topic 階層。
+   - 前端透過 API 取得列表，並以 `sessionId` 讀取對應 `.md` 快取即時顯示。
+3. **互動與管理**
+   - **可見性切換**：使用者切換開關；Bridge 立即更新 `visibilityFlag`。若 Session 變為隱藏，UI 立即移除。
+   - **Topic 指派**：使用者批次指派 Session 時，Bridge 呼叫 **Topic Manager** (`topic_mgr.py`) 更新 Topic JSON。
+   - **動態標題**：使用者編輯 `prompt2` 或切換可見性時，Bridge 直接修改 JSON 欄位並觸發動態標題計算。
+4. **最終匯出**
+   - 啟動全局鎖。Bridge 確認選取範圍（Topic 或 Session）。
+   - Bridge 呼叫 **Exporter** (`exporter.py`) 依邏輯順序從 `data/2-turns_md/` 抓取實體檔案，執行物理合併，結果輸出至 `data/4-exports/`。
 
-1. **啟動與初始化 (Startup)**
-   - **Node.js Bridge** 啟動 App，讀取 `sync_config.yaml` 並確認 data/ 目錄完整性。
-   - 若偵測到新數據，**Node.js Bridge** 調用 **Parser (`parser.py`)** 進行原始 JSON 到 `data/1-sessions/` 的解析轉化。
-2. **快取同步與預渲染 (Pre-rendering)**
-   - **Node.js Bridge** 調用 **Renderer (`render_md.py`)**。
-   - **Renderer** 比對 `data/1-sessions/` 的修改日期與 `data/2-turns_md/` 的現存快取，執行增量渲染，確保 UI 內容是最新的。
-3. **載入介面與數據 (UI Loading)**
-   - **Node.js Bridge** 從 `data/1-sessions/` 讀取 Session 列表，並篩選掉「所有輪次皆不可見」的 Session。
-   - **Node.js Bridge** 從 `data/3-topics/` 讀取主題層級。
-   - 前端（UI）透過 API 取得清單，並依據 `sessionId` 直接讀取對應的 .md 快取進行即時顯示。
-4. **狀態變更與管理 (Interaction & Management)**
-   - **可見性變更**：使用者切換開關，**Node.js Bridge** 立即更新 `data/1-sessions/` 中的 `visibilityFlag`。若 Session 變為隱藏狀態，UI 應立即從清單中移除。
-   - **主題歸類**：使用者執行多選歸位，**Node.js Bridge** 調用 **Topic Manager (`topic_mgr.py`)** 更新 `data/3-topics/` 下的主題 JSON。
-5. **合併導出 (Final Export)**
-   - 使用者點擊導出，**Node.js Bridge** 確認選取的範圍（Topic 或 Session）。
-   - **Node.js Bridge** 調用 **Exporter (`exporter.py`)**，依據邏輯順序抓取 `data/2-turns_md/` 的實體文件進行物理合併，產出至 `data/4-exports/`。
+### 4. Coding (實作規範)
 
-## 4. Coding (實作規範)
+#### 4.1 關鍵開發準則
 
-### 4.1 關鍵開發準則
+- **無損原則**：`0-raw/` 下的原始資料絕不可被修改。
+- **MD 為顯示基準**：UI 必須讀取生成的 `.md` 檔案。
+- **增量更新**：渲染引擎檢查雜湊或日期以避免冗餘工作。
 
-- **MD 為顯示基準**：UI 必須讀取生成的 .md 檔案。
-- **增量更新**：渲染引擎須檢查雜湊或日期，避免重複作業。
-- **無損處理**：絕對不得修改 `0-raw/` 目錄下的原始數據。
+#### 4.2 實作工具
 
-### 4.2 實作工具
-
-- **Node.js**：使用 `child_process.spawn` 調用 Python。
+- **Node.js**：使用 `child_process.spawn` 呼叫 Python。
 - **Python**：使用 `pathlib` 與 `jinja2` 引擎。
 
-### 4.3 安全與健壯性
+#### 4.3 安全與健壯性
 
-- **防禦數據競態**：當導出任務在進行中時，Node.js Bridge 必須阻塞所有寫入請求。
-- **檔案命名**：使用 Unique ID 命名，避免特殊字元衝突。
-- **阻塞控制**：處理時應提供進度回饋。
+- **防禦數據競態**：匯出任務進行期間，Node.js Bridge 須阻塞所有寫入請求。
+- **阻塞控制**：處理期間提供進度回饋。
+- **增量安全**：執行兩代比對更新時，必須保留本地使用者的編輯狀態（Prompt2/Flag）。
+- **檔案命名**：使用唯一 ID 作為檔名，避免特殊字元造成衝突。
 
-### 4.4 Topic 實作細節
+#### 4.4 Topic 實作細節
 
-- **ID 生成**：建議 topic_YYYYMMDD_random格式。
-- **層級標題**：Topic 匯出時，Session 標題降階為二級標題 (## Session: [Title])。
+- **ID 生成**：建議格式 `topic_YYYYMMDD_random`。
+- **層級標題**：Topic 匯出時，Session 標題降階為 `## Session: [Title]`。

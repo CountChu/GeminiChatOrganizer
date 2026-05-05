@@ -11,7 +11,7 @@ from jinja2 import Environment, StrictUndefined
 from . import topic_mgr
 from .exporter import export_archive, load_session, load_template_config
 from .models import Session, SessionSummary, Topic, TopicSummary
-from .parser import merge_visibility, parse_archive, write_sessions
+from .parser import parse_with_diff, write_sessions
 from .render_md import render_all, render_turn
 
 
@@ -25,6 +25,7 @@ class State:
         exports_dir: Path,
         gap_seconds: int,
         template_path: Path,
+        sync_strategy: str = "archive",
     ) -> None:
         self.raw_dir = raw_dir
         self.sessions_dir = sessions_dir
@@ -32,14 +33,19 @@ class State:
         self.topics_dir = topics_dir
         self.exports_dir = exports_dir
         self.gap_seconds = gap_seconds
+        self.sync_strategy = sync_strategy
         self.template_path = template_path
         self._sessions_cache: Optional[List[Session]] = None
 
     def ensure_loaded(self) -> List[Session]:
         if self._sessions_cache is not None:
             return self._sessions_cache
-        archive = parse_archive(self.raw_dir, self.gap_seconds)
-        merge_visibility(archive, self.sessions_dir)
+        archive = parse_with_diff(
+            self.raw_dir,
+            self.sessions_dir,
+            self.gap_seconds,
+            self.sync_strategy,
+        )
         write_sessions(archive, self.sessions_dir)
         render_all(self.sessions_dir, self.turns_md_dir, self.template_path)
         self._sessions_cache = archive.sessions
@@ -68,6 +74,7 @@ class State:
 
 def _summary(s: Session, topic_id: Optional[str]) -> SessionSummary:
     visible = sum(1 for t in s.turns if t.visibility_flag)
+    missing = sum(1 for t in s.turns if t.missing)
     return SessionSummary(
         session_id=s.session_id,
         title=s.title,
@@ -76,6 +83,7 @@ def _summary(s: Session, topic_id: Optional[str]) -> SessionSummary:
         last_active_time=s.last_active_time,
         turn_count=s.turn_count,
         visible_count=visible,
+        missing_count=missing,
         topic_id=topic_id,
     )
 
@@ -134,7 +142,13 @@ def cmd_toggle_turn(state: State, args: dict) -> dict:
     if not found:
         raise KeyError(f"turn {tid} not found in session {sid}")
     state.write_session(session)
-    return {"sessionId": sid, "turnId": tid, "visible": visible}
+    membership = topic_mgr.session_to_topic_map(topic_mgr.load_topics(state.topics_dir))
+    return {
+        "sessionId": sid,
+        "turnId": tid,
+        "visible": visible,
+        "summary": _summary(session, membership.get(session.session_id)).model_dump(by_alias=True),
+    }
 
 
 # ---------- topic commands ----------

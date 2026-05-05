@@ -30,20 +30,23 @@ def _render_attachments(turn: Turn) -> str:
 def render_turn(turn: Turn, template_cfg: dict, env: Environment) -> str:
     turn_header_tpl = env.from_string(template_cfg.get("turn_header", "## {{ timestamp }} — {{ prompt_preview }}"))
     prompt_block_tpl = env.from_string(template_cfg.get("prompt_block", "**Prompt:**\n\n{{ prompt }}"))
+    prompt2_block_tpl = env.from_string(template_cfg.get("prompt2_block", "**Prompt2:**\n\n{{ prompt2 }}"))
     response_block_tpl = env.from_string(template_cfg.get("response_block", "**Response:**\n\n{{ response_md }}"))
     response_md = html_to_markdown(turn.response) if turn.response else ""
-    display_prompt = turn.display_prompt
     ctx = {
         "timestamp": turn.timestamp,
         "kind": turn.kind,
-        "prompt": display_prompt,
-        "prompt_preview": _prompt_preview(display_prompt),
+        "prompt": turn.prompt,
+        "prompt2": turn.prompt2,
+        "prompt_preview": _prompt_preview(turn.prompt2 or turn.prompt),
         "response_md": response_md,
         "turnId": turn.turn_id,
     }
     parts: List[str] = [turn_header_tpl.render(**ctx)]
-    if display_prompt:
+    if turn.prompt:
         parts.append(prompt_block_tpl.render(**ctx))
+    if turn.prompt2:
+        parts.append(prompt2_block_tpl.render(**ctx))
     if response_md:
         parts.append(response_block_tpl.render(**ctx))
     if turn.attachments:
