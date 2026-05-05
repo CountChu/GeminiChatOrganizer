@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 TurnKind = Literal["prompted", "created", "gave", "selected", "other"]
+
+TITLE_MAX_CHARS = 20
 
 
 class _CamelModel(BaseModel):
@@ -30,7 +32,6 @@ class Turn(_CamelModel):
 
 class Session(_CamelModel):
     session_id: str = Field(alias="sessionId")
-    title: str
     start_time: str = Field(alias="beginTime")
     last_active_time: str = Field(alias="endTime")
     turns: List[Turn]
@@ -39,19 +40,30 @@ class Session(_CamelModel):
     def turn_count(self) -> int:
         return len(self.turns)
 
+    @computed_field
     @property
-    def display_title(self) -> str:
+    def title(self) -> str:
+        # First visible Turn's prompt2/prompt wins.
         for t in self.turns:
             if not t.visibility_flag:
                 continue
             if t.prompt2:
                 return t.prompt2
             if t.prompt:
-                first_line = " ".join(t.prompt.strip().splitlines())
-                if first_line:
-                    return first_line[:20]
-            return self.title
-        return self.title
+                line = " ".join(t.prompt.strip().splitlines())
+                if line:
+                    return line[:TITLE_MAX_CHARS]
+        # Fully-hidden Session: fall back to first Turn (any visibility) so it
+        # still has a recognizable name in tooling and exports.
+        if self.turns:
+            t = self.turns[0]
+            if t.prompt2:
+                return t.prompt2
+            if t.prompt:
+                line = " ".join(t.prompt.strip().splitlines())
+                if line:
+                    return line[:TITLE_MAX_CHARS]
+        return "(untitled)"
 
 
 class Archive(_CamelModel):
@@ -62,7 +74,6 @@ class Archive(_CamelModel):
 class SessionSummary(_CamelModel):
     session_id: str = Field(alias="sessionId")
     title: str
-    display_title: str = Field(default="", alias="displayTitle")
     start_time: str = Field(alias="beginTime")
     last_active_time: str = Field(alias="endTime")
     turn_count: int = Field(alias="turnCount")

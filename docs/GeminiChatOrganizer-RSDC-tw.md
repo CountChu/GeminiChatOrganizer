@@ -62,15 +62,16 @@ sessionIds = [sessionId]
 **Syntax**
 
 ```
-session = {sessionId, title, beginTime, endTime, turns}
+session = {sessionId, beginTime, endTime, turns}
 turns = [turn]
 ```
 
 **Fields**
 
 - `sessionId`: 唯一識別碼。
-- `title`: Session 標題。預設由 Parser 生成（首輪前 20 字元），後續由 Bridge 隨第一個可見輪次的 `prompt2` 或 `prompt` 變動而動態更新。
 - `beginTime` / `endTime`: Session 的起訖時間。
+
+Session **不儲存** title 欄位；標題**永遠**由 Turn 動態推導。規則：取第一個 `visibilityFlag` 為 `true` 的 Turn — 其 `prompt2`（若已設定），否則 `prompt`（首行，截斷至 20 字元）。若無任何可見 Turn，退回首個 Turn 的 `prompt2` / `prompt`，使該 Session 仍具可辨識的名稱。標題於每次讀取時計算，**永不寫入 `data/1-sessions/*.json`**。
 
 ##### Data - turn (輪次)
 
@@ -88,7 +89,7 @@ turn = {turnId, timestamp, timestampUtc, kind, prompt, prompt2, response, attach
 - `timestampUtc`: Takeout 原始值。作為排序的正規鍵；用於推導 `turnId`（T{unix_seconds}）及計算切分間隔。
 - `kind`: 區分對話類型（如 prompted）。
 - `prompt`: 來自 Takeout 的原始文字，不可變更。
-- `prompt2`: 使用者編輯的標註／次要 `prompt`。若非空，渲染時將在 Prompt 區塊後額外輸出 Prompt2 區塊（原始 `prompt` 保持不變）。Session 的顯示標題取自**第一個可見** Turn——優先使用其 `prompt2`，否則使用其 `prompt`（首行，截斷至 20 字元）；被隱藏的 Turn 會被跳過。若無可見 Turn 產出可用字串，則退回自動推導的 `title`。預設為空字串。
+- `prompt2`: 使用者編輯的標註／次要 `prompt`。若非空，渲染時將在 Prompt 區塊後額外輸出 Prompt2 區塊（原始 `prompt` 保持不變）。亦參與 Session 標題推導規則（見上方 Session）。預設為空字串。
 - `response`: 對話回覆內容。
 - `attachments`: 附件檔案名稱清單（如圖片）。
 - `visibilityFlag`: 控制該輪次是否參與顯示與導出。
@@ -155,8 +156,7 @@ response_block: "**Response:**\\n\\n{{ response_md }}"
    - **刪除處理**：依據 syncStrategy 決定是否保留已在最新原始目錄中消失的數據。
      - archive（預設）：自最新原始目錄消失的 Turn 在 `data/1-sessions/` 中予以保留，並重新標記 `missing: true`；該 Turn 的 `visibilityFlag` 與 `prompt2` 不予變更。
      - mirror：來源刪除即觸發本地同步刪除。
-   - **自動標題生成**：取首輪 Turn 的 prompt 前 20 個字元作為預設 `title`。
-   - **產出**：產出包含內容與預設 `visibilityFlag: true` 的 Session JSON。
+   - **產出**：產出包含內容與預設 `visibilityFlag: true` 的 Session JSON；**不寫入 `title` 欄位**，標題依需求由可見 Turn 動態推導（見 §2.1 Session）。
 2. **sessionsDir -> turnsMdDir (快取預渲染)**
    - **Renderer** 將每一輪 Turn 渲染為單獨的 Markdown 快取，供 UI 顯示使用。
    - 確保 UI 預覽與最終匯出使用相同的渲染引擎。
@@ -165,7 +165,7 @@ response_block: "**Response:**\\n\\n{{ response_md }}"
      - 使用者在 UI 中多選 Session 並指派至自訂 Topic。
      - **排序彈性**：在 Topic 內可手動調整 Session 順序。
      - **解散與移動**：刪除 Topic 僅解除邏輯關聯；底層 Session 不會被刪除。
-   - **動態標題邏輯**：當使用者編輯 `prompt2` 或切換可見性時，**Bridge** 必須重新推導該 Session 的 `title` 並更新至 JSON。
+   - **動態標題**：Session 標題每次讀取時皆由 Turn 重新推導（見 §2.1）；使用者編輯 `prompt2` 或切換可見性後，無需另行寫入標題，下次讀取即反映新值。
    - 產出 Topic 後設資料 JSON，建立實體資料間的邏輯映射。
 4. **topicsDir -> exportsDir (最終物理合併)**
    - **Exporter** 依據 Topic 定義順序，抓取實體快取檔案進行合併產出。
@@ -175,7 +175,7 @@ response_block: "**Response:**\\n\\n{{ response_md }}"
 
 - **即時回饋**：`visibilityFlag` 的變更須立即反映於 UI。
 - **缺失輪次過濾**：Session 視圖提供「Hide missing turns」開關，勾選時隱藏 `missing: true` 的 Turn。預設關閉（顯示缺失 Turn）。`missing` 欄位在 UI 中為唯讀；僅 Parser 在 `archive` 模式下執行兩代比對時設定。
-- **Session 自動隱藏**：若 Session 內所有 Turn 的 `visibilityFlag` 皆為 false，該 Session 須從側邊欄與搜尋結果中隱藏。
+- **Session 自動隱藏**：當「Hide hidden turns」過濾器開啟時，所有 Turn 的 `visibilityFlag` 皆為 false 的 Session 須從側邊欄與搜尋結果中隱藏；過濾器關閉時（預設），該類 Session 仍保持顯示，其 `visibleCount/turnCount` 計數會清楚反映此狀態。
 - **批次選取**：支援批次選取 Session 進行 Topic 分類。
 - **整理動作**：使用者明確觸發匯出動作。
   - UI 須在產出文件前要求確認。
@@ -230,7 +230,7 @@ data/
 3. **互動與管理**
    - **可見性切換**：使用者切換開關；Bridge 立即更新 `visibilityFlag`。若 Session 變為隱藏，UI 立即移除。
    - **Topic 指派**：使用者批次指派 Session 時，Bridge 呼叫 **Topic Manager** (`topic_mgr.py`) 更新 Topic JSON。
-   - **動態標題**：使用者編輯 `prompt2` 或切換可見性時，Bridge 直接修改 JSON 欄位並觸發動態標題計算。
+   - **動態標題**：使用者編輯 `prompt2` 或切換可見性時，Bridge 僅修改受影響的 Turn 欄位；Session 標題在下次讀取時由可見 Turn 重新推導，無需另行寫入。
 4. **最終匯出**
    - 啟動全局鎖。Bridge 確認選取範圍（Topic 或 Session）。
    - Bridge 呼叫 **Exporter** (`exporter.py`) 依邏輯順序從 `data/2-turns_md/` 抓取實體檔案，執行物理合併，結果輸出至 `data/4-exports/`。

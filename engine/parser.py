@@ -6,11 +6,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from .models import Archive, Session, Turn, TurnKind
+from .models import TITLE_MAX_CHARS, Archive, Session, Turn, TurnKind
 
 ACTIVITY_FILENAME = "我的活動.json"
-TITLE_MAX_CHARS = 20
 RAW_DIR_PATTERN = re.compile(r"^Gemini Apps (\d{6})$")
+__all__ = ["ACTIVITY_FILENAME", "RAW_DIR_PATTERN", "TITLE_MAX_CHARS"]
 _RESOLVE_EXTS = (".jpg", ".jpeg", ".png", ".gif", ".webp", ".md", ".txt", ".pdf", ".json")
 
 _TITLE_PREFIX_TO_KIND: Dict[str, TurnKind] = {
@@ -113,12 +113,6 @@ def _entry_to_turn(entry: dict, raw_dir: Path) -> Optional[Turn]:
     )
 
 
-def _make_title(group: List[Turn]) -> str:
-    src = next((t.prompt for t in group if t.kind == "prompted" and t.prompt), group[0].prompt) or ""
-    src = " ".join(src.strip().splitlines())
-    return src[:TITLE_MAX_CHARS] if src else "(untitled)"
-
-
 def _group_sessions(turns: List[Turn], gap_seconds: int) -> List[Session]:
     if not turns:
         return []
@@ -138,7 +132,6 @@ def _group_sessions(turns: List[Turn], gap_seconds: int) -> List[Session]:
         sessions.append(
             Session(
                 session_id=f"S{first_unix}",
-                title=_make_title(group),
                 start_time=group[0].timestamp,
                 last_active_time=group[-1].timestamp,
                 turns=group,
@@ -201,7 +194,10 @@ def write_sessions(archive: Archive, sessions_dir: Path) -> List[Path]:
     written: List[Path] = []
     for session in archive.sessions:
         path = sessions_dir / f"session_{session.session_id}.json"
-        path.write_text(session.model_dump_json(indent=2, by_alias=True), encoding="utf-8")
+        path.write_text(
+            session.model_dump_json(indent=2, by_alias=True, exclude={"title"}),
+            encoding="utf-8",
+        )
         written.append(path)
     return written
 

@@ -42,7 +42,7 @@ def render_session(session: Session, template_cfg: dict, turns_md_dir: Path) -> 
     session_header_tpl = env.from_string(template_cfg.get("session_header", "# {{ title }}"))
 
     header = session_header_tpl.render(
-        title=session.display_title,
+        title=session.title,
         session_id=session.session_id,
         start_time=session.start_time,
         last_active_time=session.last_active_time,
@@ -66,7 +66,7 @@ def export_session(session: Session, template_cfg: dict, exports_dir: Path, turn
     pattern = template_cfg.get("filename_pattern", "{date}_{sid}_{slug}.md")
     slug_max = int(template_cfg.get("slug_max_chars", 40))
     date = session.start_time.split(" ", 1)[0]
-    filename = pattern.format(date=date, sid=session.session_id, slug=_slugify(session.display_title, slug_max))
+    filename = pattern.format(date=date, sid=session.session_id, slug=_slugify(session.title, slug_max))
     path = exports_dir / filename
     path.write_text(render_session(session, template_cfg, turns_md_dir), encoding="utf-8")
     return path
@@ -101,7 +101,7 @@ def render_topic(topic: Topic, sessions_by_id: Dict[str, Session], template_cfg:
         if not rendered_turns:
             continue
         block = (
-            session_block_tpl.render(title=session.display_title, session_id=session.session_id,
+            session_block_tpl.render(title=session.title, session_id=session.session_id,
                                      start_time=session.start_time, last_active_time=session.last_active_time)
             + f"\n\n_{session.start_time} – {session.last_active_time}_\n\n"
             + sep.join(rendered_turns)

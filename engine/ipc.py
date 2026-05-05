@@ -64,7 +64,10 @@ class State:
     def write_session(self, session: Session) -> None:
         self.sessions_dir.mkdir(parents=True, exist_ok=True)
         path = self.sessions_dir / f"session_{session.session_id}.json"
-        path.write_text(session.model_dump_json(indent=2, by_alias=True), encoding="utf-8")
+        path.write_text(
+            session.model_dump_json(indent=2, by_alias=True, exclude={"title"}),
+            encoding="utf-8",
+        )
         if self._sessions_cache is not None:
             for i, s in enumerate(self._sessions_cache):
                 if s.session_id == session.session_id:
@@ -78,7 +81,6 @@ def _summary(s: Session, topic_id: Optional[str]) -> SessionSummary:
     return SessionSummary(
         session_id=s.session_id,
         title=s.title,
-        display_title=s.display_title,
         start_time=s.start_time,
         last_active_time=s.last_active_time,
         turn_count=s.turn_count,

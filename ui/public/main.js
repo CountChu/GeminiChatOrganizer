@@ -18,18 +18,6 @@ const rawUrl = (n) => "/raw/" + encodeURIComponent(n);
 const turnMdUrl = (id) => "/turns_md/" + encodeURIComponent(id) + ".md";
 
 function displayTitle(s) {
-  if (s.displayTitle) return s.displayTitle;
-  if (s.turns) {
-    for (const t of s.turns) {
-      if (!t.visibilityFlag) continue;
-      if (t.prompt2) return t.prompt2;
-      if (t.prompt) {
-        const line = t.prompt.split(/\r?\n/, 1)[0].trim();
-        if (line) return line.slice(0, 20);
-      }
-      break;
-    }
-  }
   return s.title || "(untitled)";
 }
 const displayPrompt = (t) => (t.prompt2 || t.prompt || "");
@@ -138,7 +126,7 @@ async function fetchTurnMd(turnId) {
 function renderSidebar() {
   const q = elSearch.value.trim().toLowerCase();
   const matchesQ = (s) => !q || s.title.toLowerCase().includes(q);
-  const isVisible = (s) => s.visibleCount > 0;
+  const isVisible = (s) => !state.hideHidden || s.visibleCount > 0;
   const ord = state.sortDir === "desc"
     ? (a, b) => b.beginTime.localeCompare(a.beginTime)
     : (a, b) => a.beginTime.localeCompare(b.beginTime);
