@@ -6,6 +6,7 @@ const state = {
   currentTopic: null,   // current topic detail
   view: "empty",        // empty | turns | topic
   sortDir: "asc",
+  topicSortDir: "asc",
   hideHidden: false,
   hideMissing: false,
   mdPreview: false,
@@ -133,7 +134,19 @@ function renderSidebar() {
 
   // Topics group
   elTopicsBody.innerHTML = "";
-  for (const tp of [...state.topics].sort((a, b) => a.created.localeCompare(b.created))) {
+  const topicTime = (tp) => {
+    let latest = null;
+    for (const sid of tp.sessionIds || []) {
+      const s = sessionSummary(sid);
+      if (!s) continue;
+      if (latest === null || s.endTime > latest) latest = s.endTime;
+    }
+    return latest || tp.created;
+  };
+  const topicOrd = state.topicSortDir === "desc"
+    ? (a, b) => topicTime(b).localeCompare(topicTime(a))
+    : (a, b) => topicTime(a).localeCompare(topicTime(b));
+  for (const tp of [...state.topics].sort(topicOrd)) {
     const tDiv = document.createElement("div");
     tDiv.className = "topic-row";
     tDiv.dataset.id = tp.topicId;
@@ -583,6 +596,11 @@ $("#reload-btn").addEventListener("click", reload);
 $("#sort-btn").addEventListener("click", () => {
   state.sortDir = state.sortDir === "asc" ? "desc" : "asc";
   $("#sort-btn").textContent = state.sortDir === "asc" ? "Time ↑" : "Time ↓";
+  renderSidebar();
+});
+$("#topics-sort-btn").addEventListener("click", () => {
+  state.topicSortDir = state.topicSortDir === "asc" ? "desc" : "asc";
+  $("#topics-sort-btn").textContent = state.topicSortDir === "asc" ? "Time ↑" : "Time ↓";
   renderSidebar();
 });
 $("#hide-hidden").addEventListener("change", (e) => {
