@@ -180,6 +180,11 @@ response_block: "**Response:**\\n\\n{{ response_md }}"
 - **整理動作**：使用者明確觸發匯出動作。
   - UI 須在產出文件前要求確認。
   - **全局鎖定**：匯出動作執行期間，**Node.js Bridge** 必須阻塞所有對 1-sessions/ 與 3-topics/ 的寫入請求，防止資料競態。
+- **Topic 排序**：Topics 面板依各 Topic 成員 Session 中**最新的 `endTime`** 排序；無成員的 Topic 退回其自身 `created` 時間。使用者透過 `Time ↑/↓` 控件切換升降序。
+- **Topic 內 Session 順序**：在側邊欄各 Topic 之巢狀 Session 清單中，Session 始終以 `beginTime` 由舊至新顯示，與全域 Session 排序方向無關。
+- **過濾器預設值**：三個過濾開關 ──「Hide hidden turns」「Hide missing turns」「MD preview」── 預設皆為勾選狀態，使首次瀏覽即呈現最簡潔的視圖。
+- **Edit prompt2 對話框**：開啟 prompt2 編輯器時，若 `prompt2` 非空則預填其值，否則預填原始 `prompt`。清空欄位後儲存即得空 `prompt2`（亦即恢復顯示原始 `prompt`）。
+- **Metrics 對話框**：「Show Metrics」動作會開啟對話框，彙整資料集 ── Topics 總數、Sessions（含完全隱藏者計數）、Turns（含隱藏與缺失計數）。狀態列不顯示這些彙整數值。
 
 ### 3. Design (設計) — 「系統如何架構？」
 
@@ -191,6 +196,7 @@ response_block: "**Response:**\\n\\n{{ response_md }}"
   - **Topic Manager (`topic_mgr.py`)**：負責 Topic 的 CRUD 操作與 `updated` 時間戳更新。
   - **Renderer (`render_md.py`)**：負責增量渲染 Markdown 快取。
   - **Exporter (`exporter.py`)**：合併實體快取並套用範本。
+- **前端 UI** (`ui/public/index.html`、`ui/public/main.js`)：實作畫面佈局、側邊欄與細節面板，以及 §2.4 所定義之所有 UI 互動規則 —— 逐輪可見性切換、過濾開關與其預設勾選狀態、Topic 與 Session 排序、批次選取、Edit `prompt2` 對話框、Metrics 對話框、整理動作確認流程。
 
 #### 3.2 資料目錄結構
 

@@ -187,6 +187,11 @@ The data-transformation pipeline within the system, and the logic embedded at ea
 - **Organize Action**: The user explicitly triggers the export action.
   - The UI must request confirmation before producing the document.
   - **Global Lock**: During execution the UI enters a locked state, **prohibiting all write operations** (including visibility toggles and Topic changes), to avoid data races.
+- **Topic Sort**: The Topics panel sorts entries by the latest `endTime` among each Topic's member Sessions; an empty Topic falls back to its `created` time. The user toggles ascending/descending via a `Time ↑/↓` control.
+- **Session Order within a Topic**: Inside each Topic's nested session list (sidebar), Sessions are always shown oldest first by `beginTime`, independent of the global Session sort direction.
+- **Filter Defaults**: The three filter toggles — *Hide hidden turns*, *Hide missing turns*, *MD preview* — are checked by default, so the first-time view is the cleanest representation.
+- **Edit prompt2 Dialog**: Opening the editor pre-populates the input with the current `prompt2` if non-empty, otherwise with the original `prompt`. Clearing the field saves an empty `prompt2` (i.e., reverts to displaying the original `prompt`).
+- **Metrics Dialog**: A "Show Metrics" action opens a dialog summarising the dataset — total Topics, Sessions (with the count of fully-hidden ones), and Turns (with hidden and missing counts). The status bar does not display these aggregates.
 
 ## 3. Design — "How is the system architected?"
 
@@ -198,6 +203,7 @@ The data-transformation pipeline within the system, and the logic embedded at ea
   - **Topic Manager (`topic_mgr.py`)**: Handles Topic CRUD operations and ensures the `updated` timestamp is refreshed on every change.
   - **Renderer (`render_md.py`)**: Reads Session JSON and performs incremental Markdown cache rendering.
   - **Exporter (`exporter.py`)**: Reads export requests, merges visible MD cache files in Topic / Session order, and produces the final artifact.
+- **Front-end UI** (`ui/public/index.html`, `ui/public/main.js`): Implements the layout, sidebar/detail panes, and all of the UI Interaction Rules in §2.4 — per-turn visibility toggles, filter toggles and their default-checked state, Topic and Session sort, batch select, Edit `prompt2` dialog, Metrics dialog, and the Organize confirmation flow.
 
 ### 3.2 Directory Structure
 
