@@ -90,6 +90,8 @@ class Topic(_CamelModel):
     tags: List[str] = Field(default_factory=list)
     created_at: str = Field(alias="created")  # YYYY-MM-DD HH:mm:ss
     updated_at: Optional[str] = Field(default=None, alias="updated")
+    begin_time: Optional[str] = Field(default=None, alias="beginTime")  # min(beginTime) over members
+    end_time: Optional[str] = Field(default=None, alias="endTime")      # max(endTime) over members
 
 
 class TopicSummary(_CamelModel):
@@ -97,3 +99,5 @@ class TopicSummary(_CamelModel):
     name: str
     session_count: int = Field(alias="sessionCount")
     created_at: str = Field(alias="created")
+    begin_time: Optional[str] = Field(default=None, alias="beginTime")
+    end_time: Optional[str] = Field(default=None, alias="endTime")

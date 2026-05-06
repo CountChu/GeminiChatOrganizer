@@ -91,7 +91,18 @@ def _summary(s: Session, topic_id: Optional[str]) -> SessionSummary:
 
 
 def _topic_summary(t: Topic) -> TopicSummary:
-    return TopicSummary(topic_id=t.topic_id, name=t.name, session_count=len(t.session_ids), created_at=t.created_at)
+    return TopicSummary(
+        topic_id=t.topic_id,
+        name=t.name,
+        session_count=len(t.session_ids),
+        created_at=t.created_at,
+        begin_time=t.begin_time,
+        end_time=t.end_time,
+    )
+
+
+def _sessions_by_id(state: "State") -> Dict[str, Session]:
+    return {s.session_id: s for s in state.ensure_loaded()}
 
 
 # ---------- session commands ----------
@@ -156,7 +167,7 @@ def cmd_toggle_turn(state: State, args: dict) -> dict:
 # ---------- topic commands ----------
 
 def cmd_list_topics(state: State, _args: dict) -> dict:
-    topics = topic_mgr.load_topics(state.topics_dir)
+    topics = topic_mgr.refresh_all_times(state.topics_dir, _sessions_by_id(state))
     return {"topics": [_topic_summary(t).model_dump(by_alias=True) for t in topics]}
 
 
@@ -180,6 +191,8 @@ def cmd_create_topic(state: State, args: dict) -> dict:
     description = args.get("description", "") or ""
     tags = list(args.get("tags") or [])
     topic = topic_mgr.create_topic(state.topics_dir, name=name, session_ids=sids, description=description, tags=tags)
+    topic_mgr.refresh_all_times(state.topics_dir, _sessions_by_id(state))
+    topic = topic_mgr.load_topic(state.topics_dir, topic.topic_id)
     return {"topic": topic.model_dump(by_alias=True)}
 
 
@@ -205,15 +218,17 @@ def cmd_delete_topic(state: State, args: dict) -> dict:
 def cmd_add_sessions_to_topic(state: State, args: dict) -> dict:
     tid = args["topicId"]
     sids = list(args.get("sessionIds") or [])
-    topic = topic_mgr.add_sessions(state.topics_dir, tid, sids)
-    return {"topic": topic.model_dump(by_alias=True)}
+    topic_mgr.add_sessions(state.topics_dir, tid, sids)
+    topic_mgr.refresh_all_times(state.topics_dir, _sessions_by_id(state))
+    return {"topic": topic_mgr.load_topic(state.topics_dir, tid).model_dump(by_alias=True)}
 
 
 def cmd_remove_sessions_from_topic(state: State, args: dict) -> dict:
     tid = args["topicId"]
     sids = list(args.get("sessionIds") or [])
-    topic = topic_mgr.remove_sessions(state.topics_dir, tid, sids)
-    return {"topic": topic.model_dump(by_alias=True)}
+    topic_mgr.remove_sessions(state.topics_dir, tid, sids)
+    topic_mgr.refresh_all_times(state.topics_dir, _sessions_by_id(state))
+    return {"topic": topic_mgr.load_topic(state.topics_dir, tid).model_dump(by_alias=True)}
 
 
 def cmd_reorder_topic_sessions(state: State, args: dict) -> dict:
@@ -245,6 +260,7 @@ def cmd_export(state: State, args: dict) -> dict:
 
 def cmd_reload(state: State, _args: dict) -> dict:
     sessions = state.reload()
+    topic_mgr.refresh_all_times(state.topics_dir, {s.session_id: s for s in sessions})
     return {"count": len(sessions)}
 
 

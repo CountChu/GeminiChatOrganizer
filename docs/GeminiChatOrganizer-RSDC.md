@@ -42,14 +42,15 @@ This document defines the development framework for the "Gemini Chat Organizer,"
 **Syntax**
 
 ```
-topic = {topicId, name, description, sessionIds, tags, created, updated}
+topic = {topicId, name, description, sessionIds, tags, created, updated, beginTime, endTime}
 sessionIds = [sessionId]
 ```
 
 **Fields**
 
 - `sessionIds`: Ordered list that determines the order of Sessions on export.
-- updated: Whenever a Topic is changed (Session added/removed, reordered, name modified), the system must update this timestamp automatically.
+- `updated`: Whenever a Topic is changed (Session added/removed, reordered, name modified), the system must update this timestamp automatically.
+- `beginTime` / `endTime`: Aggregate window over the Topic's member Sessions — `beginTime` = `min(session.beginTime)`, `endTime` = `max(session.endTime)`. Recomputed (and persisted) whenever Sessions are added/removed or the underlying Sessions' time ranges change. Both are `null` for an empty Topic.
 
 #### Data - archive
 
@@ -187,7 +188,8 @@ The data-transformation pipeline within the system, and the logic embedded at ea
 - **Organize Action**: The user explicitly triggers the export action.
   - The UI must request confirmation before producing the document.
   - **Global Lock**: During execution the UI enters a locked state, **prohibiting all write operations** (including visibility toggles and Topic changes), to avoid data races.
-- **Topic Sort**: The Topics panel sorts entries by the latest `endTime` among each Topic's member Sessions; an empty Topic falls back to its `created` time. The user toggles ascending/descending via a `Time ↑/↓` control.
+- **Topic Expansion**: Each Topic row in the Topics panel can be clicked to toggle showing its nested Session list; clicking also navigates to the Topic detail view. The panel header has an Expand/Collapse control that toggles **all** Topics at once; its label reflects the inverse action (reads "Expand" when not every Topic is expanded, "Collapse" when every Topic is expanded). Initial state: every Topic is collapsed.
+- **Topic Sort**: The Topics panel sorts entries by `topic.endTime` (i.e., the maximum `endTime` across the Topic's member Sessions, persisted on the Topic — see §2.1). Each row also displays this `endTime` (date portion) as a secondary line below the Topic name; when `endTime` is `null` (empty Topic), the displayed time is blank. For ordering, empty Topics fall back to `topic.created` so they remain comparable. The user toggles ascending/descending via a `Time ↑/↓` control.
 - **Session Order within a Topic**: Inside each Topic's nested session list (sidebar), Sessions are always shown oldest first by `beginTime`, independent of the global Session sort direction.
 - **Filter Defaults**: The three filter toggles — *Hide hidden turns*, *Hide missing turns*, *MD preview* — are checked by default, so the first-time view is the cleanest representation.
 - **Edit prompt2 Dialog**: Opening the editor pre-populates the input with the current `prompt2` if non-empty, otherwise with the original `prompt`. Clearing the field saves an empty `prompt2` (i.e., reverts to displaying the original `prompt`).

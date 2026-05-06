@@ -5,8 +5,9 @@ const state = {
   current: null,        // current session detail
   currentTopic: null,   // current topic detail
   view: "empty",        // empty | turns | topic
-  sortDir: "asc",
-  topicSortDir: "asc",
+  sortDir: "desc",
+  topicSortDir: "desc",
+  expandedTopics: new Set(),
   hideHidden: true,
   hideMissing: true,
   mdPreview: true,
@@ -134,15 +135,7 @@ function renderSidebar() {
 
   // Topics group
   elTopicsBody.innerHTML = "";
-  const topicTime = (tp) => {
-    let latest = null;
-    for (const sid of tp.sessionIds || []) {
-      const s = sessionSummary(sid);
-      if (!s) continue;
-      if (latest === null || s.endTime > latest) latest = s.endTime;
-    }
-    return latest || tp.created;
-  };
+  const topicTime = (tp) => tp.endTime || tp.created;
   const topicOrd = state.topicSortDir === "desc"
     ? (a, b) => topicTime(b).localeCompare(topicTime(a))
     : (a, b) => topicTime(a).localeCompare(topicTime(b));
@@ -153,19 +146,26 @@ function renderSidebar() {
     if (state.currentTopic && state.currentTopic.topicId === tp.topicId) tDiv.classList.add("active");
     const head = document.createElement("div");
     head.className = "topic-head-row";
-    head.innerHTML = `<span class="topic-name"></span><span class="topic-count"></span>`;
+    head.innerHTML = `<div class="topic-text"><div class="topic-name"></div><div class="topic-time"></div></div><span class="topic-count"></span>`;
     head.querySelector(".topic-name").textContent = tp.name;
+    head.querySelector(".topic-time").textContent = tp.endTime ? tp.endTime.split(" ")[0] : "";
     head.querySelector(".topic-count").textContent = tp.sessionCount;
-    head.addEventListener("click", () => loadTopic(tp.topicId));
+    head.addEventListener("click", () => {
+      if (state.expandedTopics.has(tp.topicId)) state.expandedTopics.delete(tp.topicId);
+      else state.expandedTopics.add(tp.topicId);
+      loadTopic(tp.topicId);
+    });
     tDiv.appendChild(head);
 
-    const ul = document.createElement("ul");
-    ul.className = "group-list nested";
-    const memberSummaries = state.sessions
-      .filter((s) => s.topicId === tp.topicId && matchesQ(s) && isVisible(s))
-      .sort((a, b) => a.beginTime.localeCompare(b.beginTime));
-    for (const s of memberSummaries) ul.appendChild(sessionRow(s, tp.topicId));
-    tDiv.appendChild(ul);
+    if (state.expandedTopics.has(tp.topicId)) {
+      const ul = document.createElement("ul");
+      ul.className = "group-list nested";
+      const memberSummaries = state.sessions
+        .filter((s) => s.topicId === tp.topicId && matchesQ(s) && isVisible(s))
+        .sort((a, b) => a.beginTime.localeCompare(b.beginTime));
+      for (const s of memberSummaries) ul.appendChild(sessionRow(s, tp.topicId));
+      tDiv.appendChild(ul);
+    }
     elTopicsBody.appendChild(tDiv);
   }
   elTopicsCount.textContent = state.topics.length;
@@ -181,6 +181,7 @@ function renderSidebar() {
   // Refresh add-to dropdown
   refreshAddToDropdown();
   refreshMultiSelectBar();
+  refreshExpandLabel();
 }
 
 function sessionRow(s, parentTopicId) {
@@ -601,6 +602,19 @@ $("#sort-btn").addEventListener("click", () => {
 $("#topics-sort-btn").addEventListener("click", () => {
   state.topicSortDir = state.topicSortDir === "asc" ? "desc" : "asc";
   $("#topics-sort-btn").textContent = state.topicSortDir === "asc" ? "Time ↑" : "Time ↓";
+  renderSidebar();
+});
+function refreshExpandLabel() {
+  const ids = state.topics.map((t) => t.topicId);
+  const all = ids.length > 0 && ids.every((id) => state.expandedTopics.has(id));
+  $("#topics-expand-btn").textContent = all ? "Collapse" : "Expand";
+}
+$("#topics-expand-btn").addEventListener("click", () => {
+  const ids = state.topics.map((t) => t.topicId);
+  const all = ids.length > 0 && ids.every((id) => state.expandedTopics.has(id));
+  if (all) state.expandedTopics.clear();
+  else state.expandedTopics = new Set(ids);
+  refreshExpandLabel();
   renderSidebar();
 });
 $("#hide-hidden").addEventListener("change", (e) => {

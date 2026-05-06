@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from .models import Topic
+from .models import Session, Topic
 
 
 def new_topic_id() -> str:
@@ -148,3 +148,34 @@ def _dedupe_preserve_order(items: List[str]) -> List[str]:
         seen.add(x)
         out.append(x)
     return out
+
+
+def compute_times(topic: Topic, sessions: Dict[str, Session]) -> bool:
+    """In-place: set topic.begin_time = min(s.beginTime), topic.end_time = max(s.endTime)
+    over the topic's resolvable member sessions. Returns True if either changed."""
+    begin: Optional[str] = None
+    end: Optional[str] = None
+    for sid in topic.session_ids:
+        s = sessions.get(sid)
+        if s is None:
+            continue
+        if begin is None or s.start_time < begin:
+            begin = s.start_time
+        if end is None or s.last_active_time > end:
+            end = s.last_active_time
+    changed = (topic.begin_time, topic.end_time) != (begin, end)
+    topic.begin_time = begin
+    topic.end_time = end
+    return changed
+
+
+def refresh_all_times(topics_dir: Path, sessions: Dict[str, Session]) -> List[Topic]:
+    """Load every topic, recompute begin/end times, save the ones that changed."""
+    topics = load_topics(topics_dir)
+    for t in topics:
+        if compute_times(t, sessions):
+            # save_topic refreshes `updated_at`; bypass it here so a pure
+            # time refresh doesn't churn the updated timestamp.
+            path = _topic_path(topics_dir, t.topic_id)
+            path.write_text(t.model_dump_json(indent=2, by_alias=True), encoding="utf-8")
+    return topics

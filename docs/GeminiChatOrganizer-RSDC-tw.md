@@ -42,7 +42,7 @@
 **Syntax**
 
 ```
-topic = {topicId, name, description, sessionIds, tags, created, updated}
+topic = {topicId, name, description, sessionIds, tags, created, updated, beginTime, endTime}
 sessionIds = [sessionId]
 ```
 
@@ -50,6 +50,7 @@ sessionIds = [sessionId]
 
 - `sessionIds`: 有序列表，決定匯出時 Session 的先後順序。
 - `updated`: 每次對 Topic 進行異動（如增刪 Session、重排序、修改名稱）時，系統必須自動更新此時間戳。
+- `beginTime` / `endTime`: 涵蓋 Topic 成員 Session 的彙整時間區間 ──`beginTime` = `min(session.beginTime)`、`endTime` = `max(session.endTime)`。每當成員 Session 變動或底層 Session 的時間範圍改變時，系統重新計算並寫回。空 Topic 的兩值皆為 `null`。
 
 ##### Data - archive (封存區)
 
@@ -180,7 +181,8 @@ response_block: "**Response:**\\n\\n{{ response_md }}"
 - **整理動作**：使用者明確觸發匯出動作。
   - UI 須在產出文件前要求確認。
   - **全局鎖定**：匯出動作執行期間，**Node.js Bridge** 必須阻塞所有對 1-sessions/ 與 3-topics/ 的寫入請求，防止資料競態。
-- **Topic 排序**：Topics 面板依各 Topic 成員 Session 中**最新的 `endTime`** 排序；無成員的 Topic 退回其自身 `created` 時間。使用者透過 `Time ↑/↓` 控件切換升降序。
+- **Topic 展開**：Topics 面板中的每個 Topic 列項可點擊以切換顯示其巢狀 Session 清單；點擊同時導向該 Topic 的細節檢視。面板抬頭設有 Expand/Collapse 控件，可一次切換**所有** Topic；按鈕標籤反映其相反動作（並非全部展開時顯示「Expand」，全部展開時顯示「Collapse」）。初始狀態為所有 Topic 皆收合。
+- **Topic 排序**：Topics 面板依 `topic.endTime`（即各 Topic 成員 Session 中最大的 `endTime`，儲存於 Topic 自身 ── 見 §2.1）排序，並於列項中將該 `endTime`（取日期部份）顯示為 Topic 名稱下方的次行；當 `endTime` 為 `null`（空 Topic）時，顯示欄位留空。為維持可比較性，排序時空 Topic 退回以 `topic.created` 作為比較鍵。使用者透過 `Time ↑/↓` 控件切換升降序。
 - **Topic 內 Session 順序**：在側邊欄各 Topic 之巢狀 Session 清單中，Session 始終以 `beginTime` 由舊至新顯示，與全域 Session 排序方向無關。
 - **過濾器預設值**：三個過濾開關 ──「Hide hidden turns」「Hide missing turns」「MD preview」── 預設皆為勾選狀態，使首次瀏覽即呈現最簡潔的視圖。
 - **Edit prompt2 對話框**：開啟 prompt2 編輯器時，若 `prompt2` 非空則預填其值，否則預填原始 `prompt`。清空欄位後儲存即得空 `prompt2`（亦即恢復顯示原始 `prompt`）。

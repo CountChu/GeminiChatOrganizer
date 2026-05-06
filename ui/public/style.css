@@ -29,6 +29,8 @@ main { display: grid; grid-template-columns: 300px 280px 1fr; height: calc(100vh
 .topic-row.active .topic-head-row { background: #ddebff; color: #1a5dad; }
 .topic-head-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 12px; cursor: pointer; font-weight: 600; color: #214d8b; }
 .topic-head-row:hover { background: #eef3fa; }
+.topic-head-row .topic-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.topic-head-row .topic-time { font-weight: 400; font-size: 11px; color: #6b7d99; margin-top: 1px; }
 .topic-head-row .topic-count { background: #cdd9eb; color: #214d8b; font-size: 11px; padding: 1px 6px; border-radius: 8px; }
 
 #multi-select-bar { display: flex; align-items: center; gap: 6px; padding: 6px 10px; background: #fff7d6; border-bottom: 1px solid #f0d97a; font-size: 12px; }
