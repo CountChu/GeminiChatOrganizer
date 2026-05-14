@@ -181,9 +181,12 @@ The data-transformation pipeline within the system, and the logic embedded at ea
   - The system must update that Turn's `visibilityFlag` immediately and reflect the change in the UI preview at once.
 - **Missing-turn Filter**:
   - The Session view provides a "Hide missing turns" toggle that filters out Turns whose `missing` flag is `true`. Default is off (missing Turns are shown). The flag is read-only in the UI; it is set only by the Parser during two-generation diff in `archive` mode.
+- **Missing-turn Badge**: When a Turn whose `missing` flag is `true` is rendered in the Session view, its header displays a red "Missing" badge alongside the Visible/Hidden toggle, so the upstream-removed state is unmistakable even when the filter is off.
+- **All-missing Session Indicator**: When every Turn of a Session is `missing: true`, the Session's row meta line (in both the sidebar and the Topic detail view) appends a red `· Missing` suffix after the `visibleCount/turnCount visible` counter, so a Session that has nothing surviving upstream is recognizable at a glance.
 - **Session Auto-hide Logic**:
   - When the "Hide hidden turns" filter is on, Sessions whose every Turn has `visibilityFlag: false` are also hidden from the sidebar and search results.
-  - When the filter is off (default), such Sessions remain visible; their `visibleCount/turnCount` meta makes the state self-evident.
+  - When the "Hide missing turns" filter is on, Sessions whose every Turn has `missing: true` are likewise hidden from the sidebar and search results — symmetric to the visibility rule. Empty Sessions (`turnCount === 0`) are unaffected.
+  - When both filters are off, such Sessions remain visible; their `visibleCount/turnCount` meta and the red "· Missing" suffix (see All-missing Session Indicator) make the state self-evident.
 - **Batch Select**: Supports batch selection of Sessions for Topic categorization.
 - **Organize Action**: The user explicitly triggers the export action.
   - The UI must request confirmation before producing the document.
@@ -193,7 +196,7 @@ The data-transformation pipeline within the system, and the logic embedded at ea
 - **Session Order within a Topic**: Inside each Topic's nested session list (sidebar), Sessions are always shown oldest first by `beginTime`, independent of the global Session sort direction.
 - **Filter Defaults**: The three filter toggles — *Hide hidden turns*, *Hide missing turns*, *MD preview* — are checked by default, so the first-time view is the cleanest representation.
 - **Edit prompt2 Dialog**: Opening the editor pre-populates the input with the current `prompt2` if non-empty, otherwise with the original `prompt`. Clearing the field saves an empty `prompt2` (i.e., reverts to displaying the original `prompt`).
-- **Metrics Dialog**: A "Show Metrics" action opens a dialog summarising the dataset — total Topics, Sessions (with the count of fully-hidden ones), and Turns (with hidden and missing counts). The status bar does not display these aggregates.
+- **Metrics Dialog**: A "Show Metrics" action opens a dialog summarising the dataset — total Topics, Sessions (with the counts of fully-hidden and fully-missing ones), and Turns (with hidden and missing counts). The status bar does not display these aggregates.
 
 ## 3. Design — "How is the system architected?"
 

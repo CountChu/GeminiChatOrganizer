@@ -11,6 +11,8 @@ const state = {
   hideHidden: true,
   hideMissing: true,
   mdPreview: true,
+  collapsedTurns: new Set(),
+  selectedTurnIds: new Set(),
 };
 const turnMdCache = new Map();
 
@@ -93,6 +95,7 @@ function sessionSummary(id) { return state.sessions.find((s) => s.sessionId === 
 
 function metricsString() {
   const hiddenSessions = state.sessions.filter((s) => s.visibleCount === 0).length;
+  const missingSessions = state.sessions.filter((s) => s.turnCount > 0 && s.missingCount === s.turnCount).length;
   let totalTurns = 0, hiddenTurns = 0, missingTurns = 0;
   for (const ss of state.sessions) {
     totalTurns += ss.turnCount;
@@ -101,7 +104,7 @@ function metricsString() {
   }
   return (
     `${state.topics.length} topics\n` +
-    `${state.sessions.length} sessions (${hiddenSessions} hidden)\n` +
+    `${state.sessions.length} sessions (${hiddenSessions} hidden, ${missingSessions} missing)\n` +
     `${totalTurns} turns (${hiddenTurns} hidden, ${missingTurns} missing)`
   );
 }
@@ -128,7 +131,9 @@ async function fetchTurnMd(turnId) {
 function renderSidebar() {
   const q = elSearch.value.trim().toLowerCase();
   const matchesQ = (s) => !q || s.title.toLowerCase().includes(q);
-  const isVisible = (s) => !state.hideHidden || s.visibleCount > 0;
+  const isVisible = (s) =>
+    (!state.hideHidden || s.visibleCount > 0) &&
+    (!state.hideMissing || s.turnCount === 0 || s.missingCount < s.turnCount);
   const ord = state.sortDir === "desc"
     ? (a, b) => b.beginTime.localeCompare(a.beginTime)
     : (a, b) => a.beginTime.localeCompare(b.beginTime);
@@ -205,8 +210,14 @@ function sessionRow(s, parentTopicId) {
     refreshMultiSelectBar();
   });
   li.querySelector(".session-title").textContent = displayTitle(s);
-  li.querySelector(".session-meta").textContent =
-    `${s.beginTime.split(" ")[0]} · ${s.visibleCount}/${s.turnCount} visible`;
+  const meta = li.querySelector(".session-meta");
+  meta.textContent = `${s.beginTime.split(" ")[0]} · ${s.visibleCount}/${s.turnCount} visible`;
+  if (s.turnCount > 0 && s.missingCount === s.turnCount) {
+    const m = document.createElement("span");
+    m.className = "row-missing";
+    m.textContent = " · Missing";
+    meta.appendChild(m);
+  }
   li.addEventListener("click", () => loadSession(s.sessionId));
   return li;
 }
@@ -224,7 +235,9 @@ function refreshMultiSelectBar() {
 
 function refreshAddToDropdown() {
   elMSAdd.innerHTML = '<option value="">Add to…</option>';
-  for (const t of state.topics) {
+  const tTime = (tp) => tp.endTime || tp.created;
+  const sorted = [...state.topics].sort((a, b) => tTime(b).localeCompare(tTime(a)));
+  for (const t of sorted) {
     const opt = document.createElement("option");
     opt.value = t.topicId;
     opt.textContent = `${t.name} (${t.sessionCount})`;
@@ -238,6 +251,7 @@ async function loadSession(id) {
   const data = await api(`/api/sessions/${id}`);
   state.current = data.session;
   state.currentTopic = null;
+  state.selectedTurnIds.clear();
   show("turns");
   renderSessionView();
   renderSidebar();
@@ -245,6 +259,9 @@ async function loadSession(id) {
 
 async function renderSessionView() {
   if (!state.current) return;
+  state.collapsedTurns = new Set(
+    state.current.turns.filter((t) => t.collapseFlag).map((t) => t.turnId)
+  );
   elSessionTitle.textContent = displayTitle(state.current);
   const range = state.current.beginTime === state.current.endTime
     ? state.current.beginTime
@@ -257,16 +274,23 @@ async function renderSessionView() {
   );
   const mdTexts = await Promise.all(visibleTurns.map((t) => fetchTurnMd(t.turnId)));
   visibleTurns.forEach((t, i) => elTurnsList.appendChild(renderTurn(t, mdTexts[i])));
+  refreshCollapseToggleLabel();
+  refreshTurnMultiSelectBar();
 }
 
 function renderTurn(turn, turnMdText) {
   const div = document.createElement("div");
-  div.className = "turn" + (turn.visibilityFlag ? "" : " hidden");
+  div.className = "turn"
+    + (turn.visibilityFlag ? "" : " hidden")
+    + (state.collapsedTurns.has(turn.turnId) ? " collapsed" : "");
   const shown = displayPrompt(turn);
   const promptText = shown || "(no prompt — " + turn.kind + ")";
   div.innerHTML = `
     <div class="turn-head">
+      <input type="checkbox" class="turn-select" title="Select for split" />
+      <button class="collapse-btn" title="Collapse / expand turn"></button>
       <button class="toggle-btn"></button>
+      <span class="turn-missing" hidden>Missing</span>
       <span class="turn-ts"></span>
       <span class="turn-kind"></span>
       <button class="icon-btn turn-edit" title="Edit prompt (prompt2)">✎</button>
@@ -283,6 +307,30 @@ function renderTurn(turn, turnMdText) {
   btn.dataset.visible = String(turn.visibilityFlag);
   btn.textContent = turn.visibilityFlag ? "Visible" : "Hidden";
   btn.addEventListener("click", () => toggleTurn(turn.turnId, !turn.visibilityFlag));
+  const cBtn = div.querySelector(".collapse-btn");
+  const setCollapseLabel = () => {
+    cBtn.textContent = state.collapsedTurns.has(turn.turnId) ? "▶" : "▼";
+  };
+  setCollapseLabel();
+  cBtn.addEventListener("click", () => {
+    const nowCollapsed = !state.collapsedTurns.has(turn.turnId);
+    if (nowCollapsed) state.collapsedTurns.add(turn.turnId);
+    else state.collapsedTurns.delete(turn.turnId);
+    turn.collapseFlag = nowCollapsed;
+    div.classList.toggle("collapsed", nowCollapsed);
+    setCollapseLabel();
+    refreshCollapseToggleLabel();
+    persistTurnCollapse([turn.turnId], nowCollapsed);
+  });
+  const selBox = div.querySelector(".turn-select");
+  selBox.checked = state.selectedTurnIds.has(turn.turnId);
+  selBox.addEventListener("click", (e) => e.stopPropagation());
+  selBox.addEventListener("change", () => {
+    if (selBox.checked) state.selectedTurnIds.add(turn.turnId);
+    else state.selectedTurnIds.delete(turn.turnId);
+    refreshTurnMultiSelectBar();
+  });
+  if (turn.missing) div.querySelector(".turn-missing").hidden = false;
   const editBtn = div.querySelector(".turn-edit");
   if (turn.prompt2) editBtn.classList.add("edited");
   editBtn.addEventListener("click", () => editTurnPrompt(turn.turnId));
@@ -417,7 +465,14 @@ function renderTopicView() {
       <button class="ts-remove" title="Remove from this Topic">×</button>
     `;
     li.querySelector(".ts-title").textContent = displayTitle(s);
-    li.querySelector(".ts-meta").textContent = `${s.sessionId} · ${s.visibleCount}/${s.turnCount} visible`;
+    const tsMeta = li.querySelector(".ts-meta");
+    tsMeta.textContent = `${s.sessionId} · ${s.visibleCount}/${s.turnCount} visible`;
+    if (s.turnCount > 0 && s.missingCount === s.turnCount) {
+      const m = document.createElement("span");
+      m.className = "row-missing";
+      m.textContent = " · Missing";
+      tsMeta.appendChild(m);
+    }
     li.querySelector(".up").addEventListener("click", () => reorder(idx, idx - 1));
     li.querySelector(".down").addEventListener("click", () => reorder(idx, idx + 1));
     li.querySelector(".ts-open").addEventListener("click", () => loadSession(s.sessionId));
@@ -594,6 +649,70 @@ elSearch.addEventListener("input", renderSidebar);
 $("#metrics-btn").addEventListener("click", () => alert(metricsString()));
 $("#organize-btn").addEventListener("click", organizeAll);
 $("#reload-btn").addEventListener("click", reload);
+function refreshCollapseToggleLabel() {
+  const btn = $("#turns-collapse-toggle");
+  if (!btn) return;
+  const turns = state.current?.turns || [];
+  const anyExpanded = turns.some((t) => !state.collapsedTurns.has(t.turnId));
+  btn.textContent = anyExpanded ? "Collapse all" : "Expand all";
+}
+function refreshTurnMultiSelectBar() {
+  const bar = $("#turn-multi-select-bar");
+  if (!bar) return;
+  const n = state.selectedTurnIds.size;
+  bar.hidden = n === 0;
+  $("#tms-count").textContent = `${n} turn${n === 1 ? "" : "s"} selected`;
+  const totalTurns = state.current?.turns?.length || 0;
+  $("#tms-split").disabled = n === 0 || n >= totalTurns;
+}
+$("#tms-clear").addEventListener("click", () => {
+  state.selectedTurnIds.clear();
+  document.querySelectorAll("#turns-list .turn-select").forEach((cb) => (cb.checked = false));
+  refreshTurnMultiSelectBar();
+});
+$("#tms-split").addEventListener("click", async () => {
+  if (!state.current) return;
+  const sid = state.current.sessionId;
+  const turnIds = [...state.selectedTurnIds];
+  if (!turnIds.length) return;
+  try {
+    setStatus("splitting…");
+    const data = await api(`/api/sessions/${sid}/split`, {
+      method: "POST", body: JSON.stringify({ turnIds }),
+    });
+    state.selectedTurnIds.clear();
+    await loadAll();
+    await loadSession(data.newSessionId);
+    setStatus("split");
+  } catch (e) { setStatus(e.message, true); }
+});
+$("#turns-collapse-toggle").addEventListener("click", () => {
+  if (!state.current) return;
+  const turns = state.current.turns;
+  const anyExpanded = turns.some((t) => !state.collapsedTurns.has(t.turnId));
+  const allIds = turns.map((t) => t.turnId);
+  if (anyExpanded) {
+    for (const t of turns) state.collapsedTurns.add(t.turnId);
+  } else {
+    state.collapsedTurns.clear();
+  }
+  for (const t of turns) t.collapseFlag = anyExpanded;
+  document.querySelectorAll("#turns-list .turn").forEach((el) => {
+    el.classList.toggle("collapsed", anyExpanded);
+    const b = el.querySelector(".collapse-btn");
+    if (b) b.textContent = anyExpanded ? "▶" : "▼";
+  });
+  refreshCollapseToggleLabel();
+  persistTurnCollapse(allIds, anyExpanded);
+});
+function persistTurnCollapse(turnIds, collapsed) {
+  if (!state.current || !turnIds.length) return;
+  const sid = state.current.sessionId;
+  api(`/api/sessions/${sid}/collapse`, {
+    method: "POST",
+    body: JSON.stringify({ turnIds, collapsed }),
+  }).catch((e) => setStatus(`collapse save failed: ${e.message}`, true));
+}
 $("#sort-btn").addEventListener("click", () => {
   state.sortDir = state.sortDir === "asc" ? "desc" : "asc";
   $("#sort-btn").textContent = state.sortDir === "asc" ? "Time ↑" : "Time ↓";
@@ -624,6 +743,7 @@ $("#hide-hidden").addEventListener("change", (e) => {
 });
 $("#hide-missing").addEventListener("change", (e) => {
   state.hideMissing = e.target.checked;
+  renderSidebar();
   if (state.view === "turns") renderSessionView();
 });
 $("#md-preview").addEventListener("change", (e) => {

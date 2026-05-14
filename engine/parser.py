@@ -113,6 +113,19 @@ def _entry_to_turn(entry: dict, raw_dir: Path) -> Optional[Turn]:
     )
 
 
+def _dedupe_turn_ids_in_session(turns: List[Turn]) -> None:
+    """Suffix colliding turn_ids within a session deterministically by order.
+    First occurrence keeps its base id; subsequent get `_1`, `_2`, ... .
+    Caller is responsible for ordering (we expect timestamp_utc order)."""
+    seen: Dict[str, int] = {}
+    for t in turns:
+        base = t.turn_id
+        n = seen.get(base, 0)
+        if n > 0:
+            t.turn_id = f"{base}_{n}"
+        seen[base] = n + 1
+
+
 def _group_sessions(turns: List[Turn], gap_seconds: int) -> List[Session]:
     if not turns:
         return []
@@ -127,6 +140,7 @@ def _group_sessions(turns: List[Turn], gap_seconds: int) -> List[Session]:
             groups[-1].append(cur)
     sessions: List[Session] = []
     for group in groups:
+        _dedupe_turn_ids_in_session(group)
         first = group[0]
         first_unix = int(datetime.fromisoformat(first.timestamp_utc.replace("Z", "+00:00")).timestamp())
         sessions.append(
@@ -171,21 +185,28 @@ def merge_visibility(archive: Archive, sessions_dir: Path) -> Archive:
             existing = json.loads(path.read_text(encoding="utf-8"))
         except Exception:
             continue
+        # Key by timestamp_utc — stable and unique even when turn_ids on disk
+        # collide from a pre-dedup parser run.
         flags: Dict[str, bool] = {}
         prompt2s: Dict[str, str] = {}
+        collapse_flags: Dict[str, bool] = {}
         for t in existing.get("turns", []):
-            tid = t.get("turnId", t.get("turn_id"))
-            if tid is None:
+            ts = t.get("timestampUtc", t.get("timestamp_utc"))
+            if ts is None:
                 continue
-            flags[tid] = bool(t.get("visibilityFlag", t.get("visibility_flag", True)))
+            flags[ts] = bool(t.get("visibilityFlag", t.get("visibility_flag", True)))
             p2 = t.get("prompt2", "")
             if p2:
-                prompt2s[tid] = p2
+                prompt2s[ts] = p2
+            collapse_flags[ts] = bool(t.get("collapseFlag", t.get("collapse_flag", False)))
         for turn in session.turns:
-            if turn.turn_id in flags:
-                turn.visibility_flag = flags[turn.turn_id]
-            if turn.turn_id in prompt2s:
-                turn.prompt2 = prompt2s[turn.turn_id]
+            ts = turn.timestamp_utc
+            if ts in flags:
+                turn.visibility_flag = flags[ts]
+            if ts in prompt2s:
+                turn.prompt2 = prompt2s[ts]
+            if ts in collapse_flags:
+                turn.collapse_flag = collapse_flags[ts]
     return archive
 
 

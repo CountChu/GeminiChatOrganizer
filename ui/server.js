@@ -80,6 +80,16 @@ app.post("/api/sessions/:id/turns/:tid/visibility", asHandler(async (req) =>
 app.patch("/api/sessions/:id/turns/:tid/prompt2", asHandler(async (req) =>
   bridge.send("update_turn_prompt", { sessionId: req.params.id, turnId: req.params.tid, prompt2: req.body?.prompt2 ?? "" })
 ));
+app.post("/api/sessions/:id/split", asHandler(async (req) =>
+  bridge.send("split_session", { sessionId: req.params.id, turnIds: req.body?.turnIds || [] })
+));
+app.post("/api/sessions/:id/collapse", asHandler(async (req) =>
+  bridge.send("set_turns_collapse", {
+    sessionId: req.params.id,
+    turnIds: req.body?.turnIds || [],
+    collapsed: !!req.body?.collapsed,
+  })
+));
 
 app.get("/api/topics", asHandler(async () => bridge.send("list_topics", {})));
 app.post("/api/topics", asHandler(async (req) => bridge.send("create_topic", {

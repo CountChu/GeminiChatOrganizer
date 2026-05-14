@@ -69,8 +69,16 @@
         <ol id="topic-sessions"></ol>
       </div>
       <div id="turns-content" hidden>
-        <h2 id="session-title"></h2>
+        <div class="session-head">
+          <h2 id="session-title"></h2>
+          <button id="turns-collapse-toggle" title="Collapse / expand all turns">Collapse all</button>
+        </div>
         <div id="session-meta"></div>
+        <div id="turn-multi-select-bar" hidden>
+          <span id="tms-count">0 turns selected</span>
+          <button id="tms-split" title="Move selected turns into a new session">Split into new session</button>
+          <button id="tms-clear" title="Clear selection">×</button>
+        </div>
         <div id="turns-list"></div>
       </div>
     </section>

@@ -176,7 +176,12 @@ response_block: "**Response:**\\n\\n{{ response_md }}"
 
 - **即時回饋**：`visibilityFlag` 的變更須立即反映於 UI。
 - **缺失輪次過濾**：Session 視圖提供「Hide missing turns」開關，勾選時隱藏 `missing: true` 的 Turn。預設關閉（顯示缺失 Turn）。`missing` 欄位在 UI 中為唯讀；僅 Parser 在 `archive` 模式下執行兩代比對時設定。
-- **Session 自動隱藏**：當「Hide hidden turns」過濾器開啟時，所有 Turn 的 `visibilityFlag` 皆為 false 的 Session 須從側邊欄與搜尋結果中隱藏；過濾器關閉時（預設），該類 Session 仍保持顯示，其 `visibleCount/turnCount` 計數會清楚反映此狀態。
+- **缺失輪次徽章**：當 `missing: true` 的 Turn 在 Session 視圖中渲染時，其抬頭旁（Visible/Hidden 切換按鈕之後）顯示紅色「Missing」徽章；即使過濾器關閉，亦可清楚辨識該 Turn 已自上游消失。
+- **全缺失 Session 指示**：當某 Session 的所有 Turn 均為 `missing: true` 時，該 Session 的列項說明行（側邊欄與 Topic 細節檢視皆然）於 `visibleCount/turnCount visible` 計數之後附加紅色「· Missing」後綴，使整個 Session 已自上游消失的狀態一目了然。
+- **Session 自動隱藏**：
+  - 當「Hide hidden turns」過濾器開啟時，所有 Turn 的 `visibilityFlag` 皆為 false 的 Session 須從側邊欄與搜尋結果中隱藏。
+  - 當「Hide missing turns」過濾器開啟時，所有 Turn 皆為 `missing: true` 的 Session 同樣須從側邊欄與搜尋結果中隱藏 ── 與可見性規則對稱。空 Session（`turnCount === 0`）不受影響。
+  - 兩過濾器皆關閉時，該類 Session 仍保持顯示，其 `visibleCount/turnCount` 計數與紅色「· Missing」後綴（見「全缺失 Session 指示」）會清楚反映此狀態。
 - **批次選取**：支援批次選取 Session 進行 Topic 分類。
 - **整理動作**：使用者明確觸發匯出動作。
   - UI 須在產出文件前要求確認。
@@ -186,7 +191,7 @@ response_block: "**Response:**\\n\\n{{ response_md }}"
 - **Topic 內 Session 順序**：在側邊欄各 Topic 之巢狀 Session 清單中，Session 始終以 `beginTime` 由舊至新顯示，與全域 Session 排序方向無關。
 - **過濾器預設值**：三個過濾開關 ──「Hide hidden turns」「Hide missing turns」「MD preview」── 預設皆為勾選狀態，使首次瀏覽即呈現最簡潔的視圖。
 - **Edit prompt2 對話框**：開啟 prompt2 編輯器時，若 `prompt2` 非空則預填其值，否則預填原始 `prompt`。清空欄位後儲存即得空 `prompt2`（亦即恢復顯示原始 `prompt`）。
-- **Metrics 對話框**：「Show Metrics」動作會開啟對話框，彙整資料集 ── Topics 總數、Sessions（含完全隱藏者計數）、Turns（含隱藏與缺失計數）。狀態列不顯示這些彙整數值。
+- **Metrics 對話框**：「Show Metrics」動作會開啟對話框，彙整資料集 ── Topics 總數、Sessions（含完全隱藏者與完全缺失者計數）、Turns（含隱藏與缺失計數）。狀態列不顯示這些彙整數值。
 
 ### 3. Design (設計) — 「系統如何架構？」
 

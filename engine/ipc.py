@@ -15,6 +15,16 @@ from .parser import parse_with_diff, write_sessions
 from .render_md import render_all, render_turn
 
 
+def _prune_orphaned_md_cache(sessions: List[Session], turns_md_dir: Path) -> None:
+    """Delete *.md files whose stem is no longer the turnId of any live turn."""
+    if not turns_md_dir.exists():
+        return
+    live = {t.turn_id for s in sessions for t in s.turns}
+    for path in turns_md_dir.glob("*.md"):
+        if path.stem not in live:
+            path.unlink()
+
+
 class State:
     def __init__(
         self,
@@ -47,6 +57,7 @@ class State:
             self.sync_strategy,
         )
         write_sessions(archive, self.sessions_dir)
+        _prune_orphaned_md_cache(archive.sessions, self.turns_md_dir)
         render_all(self.sessions_dir, self.turns_md_dir, self.template_path)
         self._sessions_cache = archive.sessions
         return archive.sessions
@@ -138,6 +149,74 @@ def cmd_update_turn_prompt(state: State, args: dict) -> dict:
         "turnId": tid,
         "prompt2": prompt2,
         "summary": _summary(session, membership.get(session.session_id)).model_dump(by_alias=True),
+    }
+
+
+def cmd_set_turns_collapse(state: State, args: dict) -> dict:
+    sid = args["sessionId"]
+    turn_ids = list(args.get("turnIds") or [])
+    collapsed = bool(args["collapsed"])
+    if not turn_ids:
+        return {"sessionId": sid, "turnIds": [], "collapsed": collapsed}
+    session = state.get_session(sid)
+    wanted = set(turn_ids)
+    found = set()
+    for t in session.turns:
+        if t.turn_id in wanted:
+            t.collapse_flag = collapsed
+            found.add(t.turn_id)
+    missing = wanted - found
+    if missing:
+        raise KeyError(f"turn(s) not in session {sid}: {sorted(missing)}")
+    state.write_session(session)
+    return {"sessionId": sid, "turnIds": sorted(found), "collapsed": collapsed}
+
+
+def cmd_split_session(state: State, args: dict) -> dict:
+    from datetime import datetime
+    sid = args["sessionId"]
+    selected_ids = list(args.get("turnIds") or [])
+    if not selected_ids:
+        raise ValueError("turnIds must be non-empty")
+
+    source = state.get_session(sid)
+    selected_set = set(selected_ids)
+    selected_turns = [t for t in source.turns if t.turn_id in selected_set]
+    remaining = [t for t in source.turns if t.turn_id not in selected_set]
+    if len(selected_turns) != len(selected_ids):
+        missing = selected_set - {t.turn_id for t in selected_turns}
+        raise KeyError(f"turn(s) not in session {sid}: {sorted(missing)}")
+    if not remaining:
+        raise ValueError("refusing to split: would leave source session empty")
+
+    earliest = min(selected_turns, key=lambda t: t.timestamp_utc)
+    new_unix = int(datetime.fromisoformat(earliest.timestamp_utc.replace("Z", "+00:00")).timestamp())
+    new_sid = f"S{new_unix}"
+    if (state.sessions_dir / f"session_{new_sid}.json").exists():
+        raise ValueError(f"sessionId collision: {new_sid} already exists on disk")
+
+    new_session = Session(
+        session_id=new_sid,
+        start_time=min(t.timestamp for t in selected_turns),
+        last_active_time=max(t.timestamp for t in selected_turns),
+        turns=selected_turns,
+    )
+
+    source.turns = remaining
+    source.start_time = min(t.timestamp for t in remaining)
+    source.last_active_time = max(t.timestamp for t in remaining)
+
+    state.write_session(new_session)
+    state.write_session(source)
+    if state._sessions_cache is not None and not any(s.session_id == new_sid for s in state._sessions_cache):
+        state._sessions_cache.append(new_session)
+
+    membership = topic_mgr.session_to_topic_map(topic_mgr.load_topics(state.topics_dir))
+    return {
+        "newSessionId": new_sid,
+        "newSession": new_session.model_dump(by_alias=True),
+        "newSummary": _summary(new_session, membership.get(new_sid)).model_dump(by_alias=True),
+        "oldSummary": _summary(source, membership.get(sid)).model_dump(by_alias=True),
     }
 
 
@@ -272,6 +351,8 @@ COMMANDS: Dict[str, Callable[[State, dict], dict]] = {
     "list_sessions": cmd_list_sessions,
     "get_session": cmd_get_session,
     "toggle_turn": cmd_toggle_turn,
+    "split_session": cmd_split_session,
+    "set_turns_collapse": cmd_set_turns_collapse,
     "update_turn_prompt": cmd_update_turn_prompt,
     "list_topics": cmd_list_topics,
     "get_topic": cmd_get_topic,

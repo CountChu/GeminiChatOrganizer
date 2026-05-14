@@ -23,6 +23,7 @@ class Turn(_CamelModel):
     response: str = ""  # raw HTML from Gemini; the Renderer turns this into MD
     attachments: List[str] = Field(default_factory=list)
     visibility_flag: bool = Field(default=True, alias="visibilityFlag")
+    collapse_flag: bool = Field(default=False, alias="collapseFlag")
     missing: bool = False
 
     @property
