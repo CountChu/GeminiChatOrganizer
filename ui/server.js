@@ -53,6 +53,36 @@ const dateSubdirs = fs.existsSync(RAW_DIR) && fs.statSync(RAW_DIR).isDirectory()
       .reverse()
       .map((n) => path.join(RAW_DIR, n))
   : [];
+function serveTextIfExtensionless(req, res, next) {
+  const name = decodeURIComponent(req.path.replace(/^\//, ""));
+  if (!name || name.includes("/") || path.extname(name)) return next();
+
+  const dirs = dateSubdirs.length > 0 ? dateSubdirs : [RAW_DIR];
+  let filePath = null;
+  for (const dir of dirs) {
+    const candidate = path.join(dir, name);
+    if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+      filePath = candidate;
+      break;
+    }
+  }
+  if (!filePath) return next();
+
+  let buf;
+  try { buf = fs.readFileSync(filePath); } catch { return next(); }
+
+  const head = buf.subarray(0, Math.min(buf.length, 8192));
+  const hasNul = head.includes(0);
+  const decoded = head.toString("utf-8");
+  const reencoded = Buffer.from(decoded, "utf-8");
+  const isText = !hasNul && Buffer.compare(reencoded, head) === 0;
+  if (!isText) return next();
+
+  res.set("Content-Type", "text/plain; charset=utf-8");
+  res.set("Content-Disposition", `inline; filename="${name}"`);
+  return res.send(buf);
+}
+app.use("/raw", serveTextIfExtensionless);
 if (dateSubdirs.length > 0) {
   for (const dir of dateSubdirs) app.use("/raw", express.static(dir));
 } else {
