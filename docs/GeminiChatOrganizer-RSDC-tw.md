@@ -183,9 +183,15 @@ response_block: "**Response:**\\n\\n{{ response_md }}"
   - 當「Hide missing turns」過濾器開啟時，所有 Turn 皆為 `missing: true` 的 Session 同樣須從側邊欄與搜尋結果中隱藏 ── 與可見性規則對稱。空 Session（`turnCount === 0`）不受影響。
   - 兩過濾器皆關閉時，該類 Session 仍保持顯示，其 `visibleCount/turnCount` 計數與紅色「· Missing」後綴（見「全缺失 Session 指示」）會清楚反映此狀態。
 - **批次選取**：支援批次選取 Session 進行 Topic 分類。
-- **整理動作**：使用者明確觸發匯出動作。
+- **整理動作（「Organize all」）**：使用者透過頂部工具列的 **Organize all** 按鈕明確觸發匯出，一次匯出**整個 Archive**——所有 Topic 與 Session，而非單一選取範圍。
   - UI 須在產出文件前要求確認。
   - **全局鎖定**：匯出動作執行期間，**Node.js Bridge** 必須阻塞所有對 1-sessions/ 與 3-topics/ 的寫入請求，防止資料競態。
+  - Exporter 依持久化的邏輯順序走訪所有 Topic 與 Session，僅輸出可見 Turn；每個 Session 的檔案寫入 `data/4-exports/sessions/`，每個 Topic 的檔案寫入 `data/4-exports/topics/`。完成後 UI 回報產出的檔案數量。
+  - **自包含圖片**：匯出結果須能脫離應用程式獨立瀏覽。Exporter 將每個被引用的原始圖片複製至 `data/4-exports/assets/`，並把每個 Markdown 圖片連結改寫為 `../assets/<name>`（依 `rawDir` 解析檔名，與 UI 的 `/raw` 查找一致）。遠端／絕對連結保持不變；磁碟上不存在對應檔案者（如 Gemini 生成的 `image_agent_tag_*`）無法在地化，維持原狀。
+- **整理此 Topic（「Organize this Topic」）**：Topic 細節檢視提供 **Organize this Topic** 按鈕，僅匯出當前開啟的 Topic，與匯出整個 Archive 的 **Organize all** 形成對比。
+  - UI 須在產出文件前要求確認（並標明 Topic 名稱）。
+  - **全局鎖定**：進入與 **Organize all** 相同的鎖定狀態，執行期間阻塞所有寫入操作。
+  - 由於範圍僅為單一 Topic，Exporter **只**寫出該 Topic 的檔案至 `data/4-exports/topics/`；此動作不產出任何 per-Session 檔案。完成後 UI 回報產出的檔案數量。
 - **Topic 展開**：Topics 面板中的每個 Topic 列項可點擊以切換顯示其巢狀 Session 清單；點擊同時導向該 Topic 的細節檢視。面板抬頭設有 Expand/Collapse 控件，可一次切換**所有** Topic；按鈕標籤反映其相反動作（並非全部展開時顯示「Expand」，全部展開時顯示「Collapse」）。初始狀態為所有 Topic 皆收合。
 - **Topic 排序**：Topics 面板依 `topic.endTime`（即各 Topic 成員 Session 中最大的 `endTime`，儲存於 Topic 自身 ── 見 §2.1）排序，並於列項中將該 `endTime`（取日期部份）顯示為 Topic 名稱下方的次行；當 `endTime` 為 `null`（空 Topic）時，顯示欄位留空。為維持可比較性，排序時空 Topic 退回以 `topic.created` 作為比較鍵。使用者透過 `Time ↑/↓` 控件切換升降序。
 - **Topic 內 Session 順序**：在側邊欄各 Topic 之巢狀 Session 清單中，Session 始終以 `beginTime` 由舊至新顯示，與全域 Session 排序方向無關。
@@ -218,6 +224,9 @@ data/
 ├── 2-turns_md/      逐 Turn MD 快取 (turnsMdDir)
 ├── 3-topics/        主題定義 JSON (topicsDir)
 └── 4-exports/       最終匯出 Markdown (exportsDir)
+    ├── assets/      匯出 Markdown 所引用的圖片檔複本
+    ├── sessions/    每個 Session 一個 Markdown 檔
+    └── topics/      每個 Topic 一個 Markdown 檔
 ```
 
 ##### 目錄角色定義
@@ -244,9 +253,10 @@ data/
    - **可見性切換**：使用者切換開關；Bridge 立即更新 `visibilityFlag`。若 Session 變為隱藏，UI 立即移除。
    - **Topic 指派**：使用者批次指派 Session 時，Bridge 呼叫 **Topic Manager** (`topic_mgr.py`) 更新 Topic JSON。
    - **動態標題**：使用者編輯 `prompt2` 或切換可見性時，Bridge 僅修改受影響的 Turn 欄位；Session 標題在下次讀取時由可見 Turn 重新推導，無需另行寫入。
-4. **最終匯出**
-   - 啟動全局鎖。Bridge 確認選取範圍（Topic 或 Session）。
-   - Bridge 呼叫 **Exporter** (`exporter.py`) 依邏輯順序從 `data/2-turns_md/` 抓取實體檔案，執行物理合併，結果輸出至 `data/4-exports/`。
+4. **最終匯出（「Organize all」）**
+   - 使用者點擊 **Organize all** 並確認；Bridge 取得全局寫入鎖，觸發整個 Archive（所有 Topic 與 Session）的匯出。
+   - Bridge 呼叫 **Exporter** (`exporter.py`) 依邏輯順序從 `data/2-turns_md/` 抓取實體檔案，執行物理合併，每個 Session 的檔案輸出至 `data/4-exports/sessions/`，每個 Topic 的檔案輸出至 `data/4-exports/topics/`。Bridge 釋放鎖並回傳寫入的檔案數量。
+   - **Topic 範圍變體（「Organize this Topic」）**：使用者在 Topic 細節檢視點擊 **Organize this Topic** 並確認。匯出請求僅帶單一 `topicId`；Bridge 取得相同的全局寫入鎖，Exporter 僅將該 Topic 的檔案寫入 `data/4-exports/topics/`（不產出任何 per-Session 檔案）。
 
 ### 4. Coding (實作規範)
 

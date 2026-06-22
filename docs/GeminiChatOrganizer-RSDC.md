@@ -188,9 +188,15 @@ The data-transformation pipeline within the system, and the logic embedded at ea
   - When the "Hide missing turns" filter is on, Sessions whose every Turn has `missing: true` are likewise hidden from the sidebar and search results — symmetric to the visibility rule. Empty Sessions (`turnCount === 0`) are unaffected.
   - When both filters are off, such Sessions remain visible; their `visibleCount/turnCount` meta and the red "· Missing" suffix (see All-missing Session Indicator) make the state self-evident.
 - **Batch Select**: Supports batch selection of Sessions for Topic categorization.
-- **Organize Action**: The user explicitly triggers the export action.
+- **Organize Action ("Organize all")**: The user explicitly triggers the export via the top-bar **Organize all** button, which exports the **entire Archive** — every Topic and Session — in one operation rather than a single selected scope.
   - The UI must request confirmation before producing the document.
   - **Global Lock**: During execution the UI enters a locked state, **prohibiting all write operations** (including visibility toggles and Topic changes), to avoid data races.
+  - The Exporter walks all Topics and Sessions in their persisted logical order, emitting visible Turns only. Per-Session files are written to `data/4-exports/sessions/` and per-Topic files to `data/4-exports/topics/`. On completion the UI reports the number of files produced.
+  - **Self-contained images**: The export must be portable without the app. The Exporter copies every referenced raw image into `data/4-exports/assets/` and rewrites each Markdown image link to `../assets/<name>` (resolving the name against `rawDir`, mirroring the UI's `/raw` lookup). Remote/absolute links are left untouched; names with no file on disk (e.g. Gemini's generated `image_agent_tag_*`) cannot be localized and remain as-is.
+- **Organize this Topic**: The Topic detail view offers an **Organize this Topic** button that exports only the currently-open Topic, in contrast to **Organize all** which exports the entire Archive.
+  - The UI must request confirmation (naming the Topic) before producing the document.
+  - **Global Lock**: It enters the same locked state as **Organize all**, prohibiting all write operations during execution.
+  - Because the scope is a single Topic, the Exporter writes **only** the per-Topic file to `data/4-exports/topics/`; no per-Session files are produced for this action. On completion the UI reports the number of files produced.
 - **Topic Expansion**: Each Topic row in the Topics panel can be clicked to toggle showing its nested Session list; clicking also navigates to the Topic detail view. The panel header has an Expand/Collapse control that toggles **all** Topics at once; its label reflects the inverse action (reads "Expand" when not every Topic is expanded, "Collapse" when every Topic is expanded). Initial state: every Topic is collapsed.
 - **Topic Sort**: The Topics panel sorts entries by `topic.endTime` (i.e., the maximum `endTime` across the Topic's member Sessions, persisted on the Topic — see §2.1). Each row also displays this `endTime` (date portion) as a secondary line below the Topic name; when `endTime` is `null` (empty Topic), the displayed time is blank. For ordering, empty Topics fall back to `topic.created` so they remain comparable. The user toggles ascending/descending via a `Time ↑/↓` control.
 - **Session Order within a Topic**: Inside each Topic's nested session list (sidebar), Sessions are always shown oldest first by `beginTime`, independent of the global Session sort direction.
@@ -223,6 +229,9 @@ data/
 ├── 2-turns_md/      Per-Turn MD cache (turnsMdDir)
 ├── 3-topics/        Topic definition JSON (topicsDir)
 └── 4-exports/       Final exported Markdown (exportsDir)
+    ├── assets/      Copied image files referenced by the exported Markdown
+    ├── sessions/    One Markdown file per Session
+    └── topics/      One Markdown file per Topic
 ```
 
 #### Directory Role Definitions
@@ -254,9 +263,10 @@ This section defines the key steps from system startup to export, along with the
    - **Visibility Change**: The user toggles a switch; the **Node.js Bridge** immediately updates the `visibilityFlag` in `data/1-sessions/`. If a Session becomes hidden, the UI removes it from the list immediately.
    - **Topic Assignment**: When the user batch-assigns Sessions, the **Node.js Bridge** invokes the **Topic Manager (`topic_mgr.py`)** to update the Topic JSON under `data/3-topics/`.
    - **Dynamic Title**: When the user edits `prompt2` or toggles visibility, the Bridge writes the affected Turn fields; the Session title is recomputed on the next read from the visible Turns and needs no separate write.
-5. **Final Export**
-   - The user clicks export; the **Node.js Bridge** confirms the selected scope (Topic or Session).
-   - The **Node.js Bridge** invokes the **Exporter (`exporter.py`)**, which pulls physical files from `data/2-turns_md/` in logical order, performs the physical merge, and emits the result into `data/4-exports/`.
+5. **Final Export ("Organize all")**
+   - The user clicks **Organize all** and confirms; the **Node.js Bridge** acquires the Global Write Lock and triggers an export of the whole Archive (all Topics and Sessions).
+   - The **Node.js Bridge** invokes the **Exporter (`exporter.py`)**, which pulls physical files from `data/2-turns_md/` in logical order, performs the physical merge, and emits per-Session files into `data/4-exports/sessions/` and per-Topic files into `data/4-exports/topics/`. The Bridge releases the lock and returns the count of files written.
+   - **Topic-scoped variant ("Organize this Topic")**: The user clicks **Organize this Topic** in the Topic detail view and confirms. The export request carries the single `topicId`; the Bridge acquires the same Global Write Lock, and the Exporter writes only that Topic's file into `data/4-exports/topics/` (no per-Session files).
 
 ## 4. Coding
 

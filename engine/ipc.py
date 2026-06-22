@@ -333,6 +333,7 @@ def cmd_export(state: State, args: dict) -> dict:
         only_session_ids=only_session_ids,
         topics=topics,
         only_topic_ids=only_topic_ids,
+        raw_dir=state.raw_dir,
     )
     return {"files": [str(p) for p in written]}
 

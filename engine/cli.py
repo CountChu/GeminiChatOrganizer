@@ -76,6 +76,7 @@ def cmd_export(args: argparse.Namespace) -> int:
         only_session_ids=args.session_ids,
         topics=topics,
         only_topic_ids=args.topic_ids,
+        raw_dir=state.raw_dir,
     )
     print(f"exported: {len(written)} files into {state.exports_dir}", file=sys.stderr)
     return 0

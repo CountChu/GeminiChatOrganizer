@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import re
+import shutil
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
+from urllib.parse import unquote
 
 import yaml
 from jinja2 import Environment, StrictUndefined
@@ -12,6 +14,56 @@ from .models import Session, Topic
 _FORBIDDEN_FS = re.compile(r'[\\/:"*?<>|\x00-\x1f]+')
 _DASHES = re.compile(r"-{2,}")
 _HEADER_LINE = re.compile(r"^(#+) ", flags=re.MULTILINE)
+
+# Inline Markdown image: ![alt](src) and ![alt](src "title")
+_IMG_MD_RE = re.compile(r'(!\[[^\]]*\]\()(\s*)(<[^>]+>|[^)\s]+)([^)]*)(\))')
+_ABS_SRC_RE = re.compile(r"^(?:[a-z][a-z0-9+.\-]*://|data:|/|#)", re.IGNORECASE)
+# Same extension fallbacks the Parser uses when Takeout's name disagrees with disk.
+_RESOLVE_EXTS = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg")
+
+
+def _raw_search_dirs(raw_dir: Path) -> List[Path]:
+    """Mirror the UI's /raw mount: each `Gemini Apps YYMMDD` subdir, newest
+    first, then raw_dir itself as a fallback for single-directory layouts."""
+    subdirs = sorted((p for p in raw_dir.glob("Gemini Apps *") if p.is_dir()), reverse=True)
+    return [*subdirs, raw_dir]
+
+
+def _find_raw_file(name: str, search_dirs: List[Path]) -> Optional[Path]:
+    for d in search_dirs:
+        if (d / name).exists():
+            return d / name
+        stem = Path(name).stem
+        for ext in _RESOLVE_EXTS:
+            cand = d / f"{stem}{ext}"
+            if cand != d / name and cand.exists():
+                return cand
+        if (d / stem).exists():
+            return d / stem
+    return None
+
+
+def _localize_images(md: str, search_dirs: List[Path], assets_dir: Path, rel_prefix: str) -> str:
+    """Copy each referenced raw image into assets_dir and rewrite the link to
+    rel_prefix + filename, so the exported Markdown is self-contained.
+
+    Remote/absolute srcs are left untouched; unresolvable names (e.g. Gemini's
+    `image_agent_tag_*` with no file on disk) are left as-is."""
+    def repl(m: re.Match) -> str:
+        open_, ws, raw_src, trailing, close = m.groups()
+        src = raw_src[1:-1] if raw_src.startswith("<") and raw_src.endswith(">") else raw_src
+        if _ABS_SRC_RE.match(src):
+            return m.group(0)
+        found = _find_raw_file(unquote(src), search_dirs)
+        if found is None:
+            return m.group(0)
+        assets_dir.mkdir(parents=True, exist_ok=True)
+        dest = assets_dir / found.name
+        if not dest.exists():
+            shutil.copy2(found, dest)
+        return f"{open_}{ws}{rel_prefix}{found.name}{trailing}{close}"
+
+    return _IMG_MD_RE.sub(repl, md)
 
 
 def _slugify(text: str, max_chars: int) -> str:
@@ -61,14 +113,26 @@ def render_session(session: Session, template_cfg: dict, turns_md_dir: Path) -> 
     return (header + "\n\n" + body).rstrip() + "\n"
 
 
-def export_session(session: Session, template_cfg: dict, exports_dir: Path, turns_md_dir: Path) -> Path:
+def export_session(
+    session: Session,
+    template_cfg: dict,
+    exports_dir: Path,
+    turns_md_dir: Path,
+    *,
+    search_dirs: Optional[List[Path]] = None,
+    assets_dir: Optional[Path] = None,
+    rel_prefix: str = "",
+) -> Path:
     exports_dir.mkdir(parents=True, exist_ok=True)
     pattern = template_cfg.get("filename_pattern", "{date}_{sid}_{slug}.md")
     slug_max = int(template_cfg.get("slug_max_chars", 40))
     date = session.start_time.split(" ", 1)[0]
     filename = pattern.format(date=date, sid=session.session_id, slug=_slugify(session.title, slug_max))
     path = exports_dir / filename
-    path.write_text(render_session(session, template_cfg, turns_md_dir), encoding="utf-8")
+    body = render_session(session, template_cfg, turns_md_dir)
+    if search_dirs and assets_dir is not None:
+        body = _localize_images(body, search_dirs, assets_dir, rel_prefix)
+    path.write_text(body, encoding="utf-8")
     return path
 
 
@@ -115,10 +179,22 @@ def render_topic(topic: Topic, sessions_by_id: Dict[str, Session], template_cfg:
     return "\n\n".join(parts).rstrip() + "\n"
 
 
-def export_topic(topic: Topic, sessions_by_id: Dict[str, Session], template_cfg: dict, exports_dir: Path, turns_md_dir: Path) -> Optional[Path]:
+def export_topic(
+    topic: Topic,
+    sessions_by_id: Dict[str, Session],
+    template_cfg: dict,
+    exports_dir: Path,
+    turns_md_dir: Path,
+    *,
+    search_dirs: Optional[List[Path]] = None,
+    assets_dir: Optional[Path] = None,
+    rel_prefix: str = "",
+) -> Optional[Path]:
     body = render_topic(topic, sessions_by_id, template_cfg, turns_md_dir)
     if body is None:
         return None
+    if search_dirs and assets_dir is not None:
+        body = _localize_images(body, search_dirs, assets_dir, rel_prefix)
     exports_dir.mkdir(parents=True, exist_ok=True)
     pattern = template_cfg.get("topic_filename_pattern", "{date}_{topic_id}_{slug}.md")
     slug_max = int(template_cfg.get("slug_max_chars", 40))
@@ -140,10 +216,22 @@ def export_archive(
     only_session_ids: Optional[List[str]] = None,
     topics: Optional[List[Topic]] = None,
     only_topic_ids: Optional[List[str]] = None,
+    raw_dir: Optional[Path] = None,
 ) -> List[Path]:
     written: List[Path] = []
     sessions_list = list(sessions)
     sessions_by_id = {s.session_id: s for s in sessions_list}
+
+    # Session exports land in exports_dir/sessions, Topic exports in exports_dir/topics
+    sessions_out = exports_dir / "sessions"
+    topics_out = exports_dir / "topics"
+
+    # Self-contained images: copy referenced raw images into exports_dir/assets
+    # and rewrite links to ../assets/<name> (both sessions/ and topics/ sit one
+    # level under exports_dir). Skipped when raw_dir is unknown.
+    assets_dir = exports_dir / "assets"
+    search_dirs = _raw_search_dirs(raw_dir) if raw_dir is not None else None
+    rel_prefix = "../assets/"
 
     # Session exports
     if only_topic_ids is None:
@@ -153,7 +241,10 @@ def export_archive(
                 continue
             if not any(t.visibility_flag for t in session.turns):
                 continue
-            written.append(export_session(session, template_cfg, exports_dir, turns_md_dir))
+            written.append(export_session(
+                session, template_cfg, sessions_out, turns_md_dir,
+                search_dirs=search_dirs, assets_dir=assets_dir, rel_prefix=rel_prefix,
+            ))
 
     # Topic exports
     if topics:
@@ -161,7 +252,10 @@ def export_archive(
         for topic in topics:
             if wanted is not None and topic.topic_id not in wanted:
                 continue
-            path = export_topic(topic, sessions_by_id, template_cfg, exports_dir, turns_md_dir)
+            path = export_topic(
+                topic, sessions_by_id, template_cfg, topics_out, turns_md_dir,
+                search_dirs=search_dirs, assets_dir=assets_dir, rel_prefix=rel_prefix,
+            )
             if path is not None:
                 written.append(path)
     return written
