@@ -47,6 +47,13 @@ function rewriteAttachmentUrls(root) {
   });
 }
 
+function stripAttachmentsSection(md) {
+  // The per-turn MD cache ends with an "**Attachments:**" block. The dedicated
+  // .turn-attachments gallery already renders those (images + links), so drop
+  // the block from the preview text to avoid showing each attachment twice.
+  return md.replace(/\n*\*\*Attachments:\*\*[\s\S]*$/, "");
+}
+
 const $ = (sel) => document.querySelector(sel);
 const elTopicsBody = $("#topics-body");
 const elTopicsCount = $("#topics-count");
@@ -342,7 +349,7 @@ function renderTurn(turn, turnMdText) {
   const respEl = div.querySelector(".turn-response");
   if (state.mdPreview && turnMdText && typeof marked !== "undefined") {
     respEl.classList.add("preview");
-    respEl.innerHTML = marked.parse(turnMdText);
+    respEl.innerHTML = marked.parse(stripAttachmentsSection(turnMdText));
     rewriteAttachmentUrls(respEl);
     if (typeof renderMathInElement === "function") {
       renderMathInElement(respEl, {

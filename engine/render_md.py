@@ -18,12 +18,19 @@ def _prompt_preview(prompt: str, limit: int = 80) -> str:
     return first_line[:limit] + ("…" if len(first_line) > limit else "")
 
 
+# Image attachments are emitted as inline image markdown (`![...]`) so the
+# Exporter's _localize_images() copies them into the export's assets/ dir and
+# they display in the Markdown preview; other attachments stay as plain links.
+_IMG_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg"}
+
+
 def _render_attachments(turn: Turn) -> str:
     if not turn.attachments:
         return ""
     lines = ["**Attachments:**", ""]
     for a in turn.attachments:
-        lines.append(f"- [{a}]({a})")
+        bang = "!" if Path(a).suffix.lower() in _IMG_EXTS else ""
+        lines.append(f"- {bang}[{a}]({a})")
     return "\n".join(lines)
 
 
