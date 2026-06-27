@@ -2,6 +2,7 @@ rawDir: "data/0-raw"
 sessionsDir: "data/1-sessions"
 turnsMdDir: "data/2-turns_md"
 topicsDir: "data/3-topics"
-exportsDir: "data/4-exports"
+exportsDir: "/Users/visualge/Library/Mobile Documents/iCloud~md~obsidian/Documents/GeminiOrganizedChats"
 sessionGapSeconds: 1800
 syncStrategy: "archive"
+templatePath: "export_template.yaml"

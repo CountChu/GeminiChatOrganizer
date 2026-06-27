@@ -13,6 +13,7 @@ const state = {
   mdPreview: true,
   collapsedTurns: new Set(),
   selectedTurnIds: new Set(),
+  exportsDir: "",       // configured export destination (from config.yaml)
 };
 const turnMdCache = new Map();
 
@@ -111,9 +112,10 @@ function metricsString() {
 
 async function loadAll() {
   setStatus("loading…");
-  const [s, t] = await Promise.all([api("/api/sessions"), api("/api/topics")]);
+  const [s, t, c] = await Promise.all([api("/api/sessions"), api("/api/topics"), api("/api/config")]);
   state.sessions = s.sessions;
   state.topics = t.topics;
+  state.exportsDir = c.exportsDir || "";
   renderSidebar();
   setStatus("");
 }
@@ -532,7 +534,8 @@ async function deleteCurrentTopic() {
 async function organizeCurrentTopic() {
   const t = state.currentTopic;
   if (!t) return;
-  if (!confirm(`Export topic "${t.name}" to data/4-exports/?`)) return;
+  const dest = state.exportsDir || "the configured export folder";
+  if (!confirm(`Export topic "${t.name}" to ${dest}?`)) return;
   elLockOverlay.hidden = false;
   try {
     const data = await api("/api/export", { method: "POST", body: JSON.stringify({ topicIds: [t.topicId] }) });
@@ -627,7 +630,7 @@ async function removeSelectionFromTopic() {
 // ---------- top-bar actions ----------
 
 async function organizeAll() {
-  if (!confirm("Export all sessions to data/4-exports/?")) return;
+  if (!confirm(`Export all sessions to ${state.exportsDir || "the configured export folder"}?`)) return;
   elLockOverlay.hidden = false;
   try {
     const data = await api("/api/export", { method: "POST", body: JSON.stringify({}) });

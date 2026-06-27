@@ -105,7 +105,7 @@ turn = {turnId, timestamp, timestampUtc, kind, prompt, prompt2, response, attach
 
 系統行為與資料流（Artifacts）由以下兩個核心 YAML 檔案所管控：
 
-##### Config - sync_config.yaml
+##### Config - config.yaml
 
 定義系統路徑、數據映射與解析規則。
 
@@ -242,7 +242,7 @@ data/
 #### 3.3 執行流程
 
 1. **啟動 (Startup)**
-   - **Node.js Bridge** (`bridge.js`) 啟動 App，讀取 `sync_config.yaml`，驗證 `data/` 目錄完整性。
+   - **Node.js Bridge** (`bridge.js`) 啟動 App，讀取 `config.yaml`，驗證 `data/` 目錄完整性。
    - Bridge 呼叫 **Parser** (`parser.py`)。Parser 對 Gemini Apps YYMMDD 目錄排序，執行兩代比對，更新 `data/1-sessions/`。
    - Bridge 呼叫 **Renderer** (`render_md.py`) 執行增量快取更新。**Renderer** 比對 `data/1-sessions/` 的修改日期與 `data/2-turns_md/` 中的既有快取，執行增量渲染以確保 UI 內容為最新。
 2. **載入 UI**

@@ -7,7 +7,7 @@ const { PythonBridge } = require("./python_bridge");
 const PORT = Number(process.env.PORT || 3030);
 const REPO_ROOT = path.resolve(__dirname, "..");
 const PYTHON_PATH = path.join(REPO_ROOT, ".venv", "bin", "python");
-const CONFIG_PATH = path.join(REPO_ROOT, "sync_config.yaml");
+const CONFIG_PATH = path.join(REPO_ROOT, "config.yaml");
 
 function loadFlatYaml(p) {
   const out = {};
@@ -147,6 +147,7 @@ app.post("/api/export", asHandler(async (req) => bridge.send("export", {
 })));
 app.post("/api/reload", asHandler(async () => bridge.send("reload", {})));
 app.get("/api/lock", (_req, res) => res.json({ locked: bridge.exportInFlight }));
+app.get("/api/config", (_req, res) => res.json({ exportsDir: syncCfg.exportsDir }));
 
 const server = app.listen(PORT, () => {
   console.log(`Gemini Chat Organizer UI on http://localhost:${PORT}`);

@@ -17,16 +17,25 @@ def _load_sync_cfg(path: Path) -> dict:
     return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
 
 
+def _require(arg_val, cfg: dict, cfg_key: str, cli_flag: str):
+    value = arg_val if arg_val is not None else cfg.get(cfg_key)
+    if value is None:
+        raise SystemExit(
+            f"missing required setting '{cfg_key}': pass {cli_flag} or set it in config.yaml"
+        )
+    return value
+
+
 def _state_from_args(args: argparse.Namespace) -> State:
     cfg = _load_sync_cfg(Path(args.config)) if args.config else {}
-    raw_dir = Path(args.raw_dir or cfg.get("rawDir"))
-    sessions_dir = Path(args.sessions_dir or cfg.get("sessionsDir", "data/1-sessions"))
-    turns_md_dir = Path(args.turns_md_dir or cfg.get("turnsMdDir", "data/2-turns_md"))
-    topics_dir = Path(args.topics_dir or cfg.get("topicsDir", "data/3-topics"))
-    exports_dir = Path(args.exports_dir or cfg.get("exportsDir", "data/4-exports"))
-    gap = int(args.gap_seconds or cfg.get("sessionGapSeconds", 1800))
-    sync_strategy = args.sync_strategy or cfg.get("syncStrategy", "archive")
-    template_path = Path(args.template or "export_template.yaml")
+    raw_dir = Path(_require(args.raw_dir, cfg, "rawDir", "--raw-dir"))
+    sessions_dir = Path(_require(args.sessions_dir, cfg, "sessionsDir", "--sessions-dir"))
+    turns_md_dir = Path(_require(args.turns_md_dir, cfg, "turnsMdDir", "--turns-md-dir"))
+    topics_dir = Path(_require(args.topics_dir, cfg, "topicsDir", "--topics-dir"))
+    exports_dir = Path(_require(args.exports_dir, cfg, "exportsDir", "--exports-dir"))
+    gap = int(_require(args.gap_seconds, cfg, "sessionGapSeconds", "--gap-seconds"))
+    sync_strategy = _require(args.sync_strategy, cfg, "syncStrategy", "--sync-strategy")
+    template_path = Path(_require(args.template, cfg, "templatePath", "--template"))
     return State(
         raw_dir=raw_dir,
         sessions_dir=sessions_dir,
@@ -93,7 +102,7 @@ def main(argv=None) -> int:
     sub = p.add_subparsers(dest="command", required=True)
 
     common = argparse.ArgumentParser(add_help=False)
-    common.add_argument("--config", default="sync_config.yaml")
+    common.add_argument("--config", default="config.yaml")
     common.add_argument("--raw-dir", dest="raw_dir")
     common.add_argument("--sessions-dir", dest="sessions_dir")
     common.add_argument("--turns-md-dir", dest="turns_md_dir")
@@ -101,7 +110,7 @@ def main(argv=None) -> int:
     common.add_argument("--exports-dir", dest="exports_dir")
     common.add_argument("--gap-seconds", dest="gap_seconds", type=int)
     common.add_argument("--sync-strategy", dest="sync_strategy", choices=["archive", "mirror"])
-    common.add_argument("--template", default="export_template.yaml")
+    common.add_argument("--template")
 
     p_parse = sub.add_parser("parse", parents=[common])
     p_parse.set_defaults(func=cmd_parse)

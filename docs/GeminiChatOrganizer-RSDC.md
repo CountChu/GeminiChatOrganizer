@@ -105,7 +105,7 @@ turn = {turnId, timestamp, timestampUtc, kind, prompt, prompt2, response, attach
 
 System behavior and the data flow (Artifacts) are governed by two core YAML files:
 
-#### Config - sync_config.yaml
+#### Config - config.yaml
 
 Defines system paths, data mappings, and parsing rules.
 
@@ -249,7 +249,7 @@ data/
 This section defines the key steps from system startup to export, along with the interactions between components.
 
 1. **Startup**
-   - The **Node.js Bridge** launches the App, reads `sync_config.yaml`, and verifies the integrity of the `data/` directory.
+   - The **Node.js Bridge** launches the App, reads `config.yaml`, and verifies the integrity of the `data/` directory.
    - If new data is detected, the **Node.js Bridge** invokes the **Parser (`parser.py`)**. The Parser sorts directories by date, locks onto the two most recent Gemini Apps YYMMDD directories, analyzes differences, and updates `data/1-sessions/`.
    - The **Node.js Bridge** invokes the **Renderer (`render_md.py`)** for incremental cache update.
 2. **Pre-rendering**

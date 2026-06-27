@@ -9,7 +9,7 @@ The two-process architecture from §3 of the spec is implemented:
 - [engine/](engine/) — Python core: `parser.py`, `topic_mgr.py`, `render_md.py`, `exporter.py`, plus `models.py` (pydantic), `ipc.py` (JSON-over-stdio), `cli.py`.
 - [ui/](ui/) — Node.js bridge ([ui/server.js](ui/server.js), [ui/python_bridge.js](ui/python_bridge.js)) and browser front-end under [ui/public/](ui/public/).
 - [data/](data/) — live working dataset under `0-raw/`, `1-sessions/`, `2-turns_md/`, `3-topics/`, `4-exports/`.
-- [sync_config.yaml](sync_config.yaml) and [export_template.yaml](export_template.yaml) — the two configs from §2.2.
+- [config.yaml](config.yaml) and [export_template.yaml](export_template.yaml) — the two configs from §2.2.
 - [requirements.txt](requirements.txt) (Python deps) and [ui/package.json](ui/package.json) (Node deps).
 
 The RSDC specification under [docs/](docs/) is the authoritative source for architecture and rules:
@@ -43,7 +43,7 @@ These are the constraints most likely to be violated by default implementations 
 - **No hardcoded paths in Python.** Node passes every path as a CLI argument when spawning the Python process. Python uses `pathlib`, never string paths or relative-path assumptions.
 - **Python functions must be type-annotated** (`typing` module); data validation uses `pydantic`. Document generation uses `markdown-it` or `jinja2`.
 - **Lock the UI while Exporter is reading.** `data/1-sessions/` is shared state; the spec calls out data-race prevention explicitly.
-- **Two config files drive behavior** — `sync_config.yaml` (sync cadence, paths) and `export_template.yaml` (Markdown template: timestamp-in-header, line-break style, etc.). New knobs should land in one of these, not as code constants.
+- **Two config files drive behavior** — `config.yaml` (sync cadence, paths) and `export_template.yaml` (Markdown template: timestamp-in-header, line-break style, etc.). New knobs should land in one of these, not as code constants.
 - **Visibility state must be persistent.** Toggling in the UI writes through to `data/1-sessions/` immediately — it's not an in-memory view filter.
 
 ## Markdown style
