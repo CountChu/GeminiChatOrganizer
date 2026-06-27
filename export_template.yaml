@@ -6,6 +6,6 @@ slug_max_chars: 40
 session_header: "# {{ title }}"
 topic_session_header: "## Session: {{ title }}"
 turn_header: "## {{ prompt_preview }}\n- Time: {{ timestamp }}"
-prompt_block: "**Prompt:**\n\n{{ prompt }}"
-prompt2_block: "**Prompt2:**\n\n{{ prompt2 }}"
+prompt_block: "**Prompt:**\n\n```\n{{ prompt }}\n```"
+prompt2_block: "**Prompt2:**\n\n```\n{{ prompt2 }}\n```"
 response_block: "**Response:**\n\n{{ response_md }}"
