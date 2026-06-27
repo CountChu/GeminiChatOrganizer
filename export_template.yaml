@@ -5,7 +5,7 @@ topic_filename_pattern: "{date}_{topic_id}_{slug}.md"
 slug_max_chars: 40
 session_header: "# {{ title }}"
 topic_session_header: "## Session: {{ title }}"
-turn_header: "## {{ timestamp }} — {{ prompt_preview }}"
+turn_header: "## {{ prompt_preview }}\n- Time: {{ timestamp }}"
 prompt_block: "**Prompt:**\n\n{{ prompt }}"
 prompt2_block: "**Prompt2:**\n\n{{ prompt2 }}"
 response_block: "**Response:**\n\n{{ response_md }}"
