@@ -1,7 +1,7 @@
 timestamp_in_header: true
 turn_separator: "\n\n---\n\n"
 filename_pattern: "{date}_{sid}_{slug}.md"
-topic_filename_pattern: "{date}_{topic_id}_{slug}.md"
+topic_filename_pattern: "{date}_{slug}.md"
 slug_max_chars: 40
 session_header: "# {{ title }}"
 topic_session_header: "## Session: {{ title }}"

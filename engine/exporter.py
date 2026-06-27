@@ -196,10 +196,16 @@ def export_topic(
     if search_dirs and assets_dir is not None:
         body = _localize_images(body, search_dirs, assets_dir, rel_prefix)
     exports_dir.mkdir(parents=True, exist_ok=True)
-    pattern = template_cfg.get("topic_filename_pattern", "{date}_{topic_id}_{slug}.md")
+    pattern = template_cfg.get("topic_filename_pattern", "{topic_id_short}_{slug}.md")
     slug_max = int(template_cfg.get("slug_max_chars", 40))
     date = topic.created_at.split(" ", 1)[0]
-    filename = pattern.format(date=date, topic_id=topic.topic_id, slug=_slugify(topic.name, slug_max))
+    # topic_id is `topic_<YYYYMMDD>_<hash>`; topic_id_short drops the `topic_`
+    # prefix so the filename reads `<YYYYMMDD>_<hash>_<slug>.md`.
+    tid = topic.topic_id
+    topic_id_short = tid[len("topic_"):] if tid.startswith("topic_") else tid
+    filename = pattern.format(
+        date=date, topic_id=tid, topic_id_short=topic_id_short, slug=_slugify(topic.name, slug_max)
+    )
     path = exports_dir / filename
     path.write_text(body, encoding="utf-8")
     return path
