@@ -11,6 +11,12 @@ stays reconstructable.
 
 Everything runs **locally** — your conversations never leave your machine.
 
+![Gemini Chat Organizer UI](docs/demo-1.png)
+
+The local web UI: a Session list on the left, your Topics in the middle, and the
+selected Session's turns rendered as Markdown on the right — where you toggle each
+turn Visible/Hidden before exporting.
+
 ---
 
 ## Features
